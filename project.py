@@ -3,9 +3,9 @@ import pandas as pd
 
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
-#hello test
+
 import black_scholes
-#hello test test
+
 # Set Pandas Display Settings
 pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 300)
@@ -55,3 +55,7 @@ df_new["Density"] = df_new["Gamma Strike"] / df_new["Gamma Strike"].sum()
 df_new["Delta Strike Bis"] = df.apply(lambda x: black_scholes.BS_Delta_Strike(f=1, k=x["Strikes"]/100, t=1, v=x["Implied_Vols"], df=1, OptType="C"), axis=1)
 
 print(df_new)
+
+plt.hist(df_new["Density"],bins=10)
+plt.show()
+
