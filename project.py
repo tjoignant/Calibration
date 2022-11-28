@@ -11,51 +11,48 @@ pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 300)
 pd.set_option('display.expand_frame_repr', False)
 
-# Set Datas
-strikes = list(i for i in range(95, 105))
-prices = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
+# Set Market Options DataFrame
+df_mkt = pd.DataFrame()
+df_mkt["Strike"] = np.arange(95, 105, 1)
+df_mkt["Price (3M)"] = [8.67, 7.14, 5.98, 4.93, 4.09, 3.99, 3.43, 3.01, 2.72, 2.53]
+df_mkt["Price (6M)"] = [10.71, 8.28, 6.91, 6.36, 5.29, 5.07, 4.76, 4.47, 4.35, 4.14]
+df_mkt["Price (9M)"] = [11.79, 8.95, 8.07, 7.03, 6.18, 6.04, 5.76, 5.50, 5.50, 5.39]
+df_mkt["Price (12M)"] = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
 
-df = pd.DataFrame()
-df["Strikes"] = strikes
-df["Prices"] = prices
+# Compute Option's Implied Volatility
+for maturity in [3, 6, 9, 12]:
+    df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
+        lambda x: black_scholes.BS_IV_Newton_Raphson(
+            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity/12, OptType="C")[0], axis=1)
 
-NewtonRaphson_IV = []
-for i in range(len(df)):
-    sigma = black_scholes.BS_IV_Newton_Raphson(MktPrice=df["Prices"][i], df=1, f=100, k=df["Strikes"][i], t=1, OptType="C")[0]
-    NewtonRaphson_IV.append(sigma)
 
-df["Implied_Vols"] = NewtonRaphson_IV
+# --------------------------- Q1 : RISK NEUTRAL DENSITY ---------------------------
+# Create Risk Neutral Density Dataframe (12M)
+f2 = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
+df_density = pd.DataFrame()
+df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.01)
+df_density["IV"] = f2(df_density["Strike"])
+df_density["Price"] = df_density.apply(
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
+df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(df_density["Strike"].diff(), 2)
+df_density["Density"] = df_density["Density"] / df_density["Density"].sum() * 100
+df_density["Gamma Strike"] = df_density.apply(lambda x: black_scholes.BS_Gamma_Strike(f=100, k=x["Strike"], t=1, v=x["IV"], df=1, OptType="C"), axis=1)
+df_density["Density Bis"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum() * 100
 
-# ----------------Interpolation----------------------
-x = list(df["Strikes"])
-y = list(df["Implied_Vols"])
-f = interp1d(x, y)
-f2 = interp1d(x, y, kind='cubic')
-xnew = np.arange(95, 104, 0.1)  # new strikes
-ynew = f2(xnew)
-plt.plot(x, y, 'o', xnew, f(xnew), '-', xnew, ynew, '--')
-plt.legend(['data', 'linear', 'cubic'], loc='best')
+# Results (dataframes + graphs)
+print(df_mkt)
+print(df_density)
+plt.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
+plt.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
+plt.title("Volatilities")
+plt.grid()
+plt.legend()
 plt.show()
-
-# ----------------New Options------------------------
-df_new = pd.DataFrame()
-
-New_Options_Prices = []
-for i in range(len(xnew)):
-    New_Options_Prices.append(black_scholes.BS_Price(df=1, f=100, k=xnew[i], t=1, v=ynew[i], OptType="C"))
-
-df_new["Strikes"] = list(xnew)
-df_new["Prices"] = New_Options_Prices
-df_new["Implied_Vols"] = list(ynew)
-
-df_new["Delta Strike"] = df_new["Prices"].diff(1) / df_new["Strikes"].diff(1)
-df_new["Gamma Strike"] = df_new["Delta Strike"].diff(1) / df_new["Strikes"].diff(1)
-df_new["Density"] = df_new["Gamma Strike"] / df_new["Gamma Strike"].sum()
-
-df_new["Delta Strike Bis"] = df.apply(lambda x: black_scholes.BS_Delta_Strike(f=1, k=x["Strikes"]/100, t=1, v=x["Implied_Vols"], df=1, OptType="C"), axis=1)
-
-print(df_new)
-
-plt.hist(df_new["Density"],bins=10)
+plt.plot(df_density["Strike"], df_density["Density Bis"])
+plt.title("Density (Gamma Strike)")
+plt.grid()
 plt.show()
-
+plt.plot(df_density["Strike"], df_density["Density"])
+plt.title("Density (Empirical)")
+plt.grid()
+plt.show()

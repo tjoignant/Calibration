@@ -71,6 +71,17 @@ def BS_Gamma(f, k, t, v, df, OptType):
     }
     return switcher.get(OptType.upper(), 0)
 
+def BS_Gamma_Strike(f, k, t, v, df, OptType):
+    d2 = BS_d2(f, k, t, v)
+    fd1 = NormalDistrib(d2)
+    switcher = {
+        "C": -(df * fd1) / (f * v * np.sqrt(t)),
+        "P": -(df * fd1) / (f * v * np.sqrt(t)),
+        "C+P": -2 * df * fd1 / (f * v * np.sqrt(t)),
+        "C-P": 0,
+    }
+    return switcher.get(OptType.upper(), 0)
+
 def BS_Vega(f, k, t, v, df, OptType):
     d1 = BS_d1(f, k, t, v)
     fd1 = NormalDistrib(d1)
