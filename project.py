@@ -30,11 +30,12 @@ for maturity in [3, 6, 9, 12]:
 # Create Risk Neutral Density Dataframe (12M)
 f2 = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
 df_density = pd.DataFrame()
-df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.01)
+df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.005)
 df_density["IV"] = f2(df_density["Strike"])
 df_density["Price"] = df_density.apply(
-    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
-df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(df_density["Strike"].diff(), 2)
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x[ "Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
+df_density["Cummulative Distribution"] = 1 + (df_density["Price"].shift(-1) - df_density["Price"].shift(1)) / 0.01
+df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(0.01, 2)
 df_density["Density"] = df_density["Density"] / df_density["Density"].sum() * 100
 df_density["Gamma Strike"] = df_density.apply(lambda x: black_scholes.BS_Gamma_Strike(f=100, k=x["Strike"], t=1, v=x["IV"], df=1, OptType="C"), axis=1)
 df_density["Density Bis"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum() * 100
@@ -50,6 +51,10 @@ plt.legend()
 plt.show()
 plt.plot(df_density["Strike"], df_density["Density Bis"])
 plt.title("Density (Gamma Strike)")
+plt.grid()
+plt.show()
+plt.plot(df_density["Strike"], df_density["Cummulative Distribution"])
+plt.title("Cummulative Distribution (Empirical)")
 plt.grid()
 plt.show()
 plt.plot(df_density["Strike"], df_density["Density"])
