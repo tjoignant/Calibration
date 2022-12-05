@@ -45,6 +45,7 @@ mean, std = np.mean(df_density["Strike"]), np.std(df_density["Strike"])
 rvs = np.linspace(mean - 3*std, mean + 3*std, 100)
 pdf = norm.pdf(rvs, mean, std)
 
+
 # Results (dataframes + graphs)
 print(df_mkt)
 print(df_density)
