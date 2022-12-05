@@ -3,6 +3,7 @@ import pandas as pd
 
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
+from scipy.stats import norm
 
 import black_scholes
 
@@ -25,7 +26,6 @@ for maturity in [3, 6, 9, 12]:
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity/12, OptType="C")[0], axis=1)
 
-
 # --------------------------- Q1 : RISK NEUTRAL DENSITY ---------------------------
 # Create Risk Neutral Density Dataframe (12M)
 f2 = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
@@ -34,11 +34,16 @@ df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0
 df_density["IV"] = f2(df_density["Strike"])
 df_density["Price"] = df_density.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x[ "Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
-df_density["Cummulative Distribution"] = 1 + (df_density["Price"].shift(-1) - df_density["Price"].shift(1)) / 0.01
+df_density["Cummulative Distribution"] = 1 + (df_density["Price"].shift(-1) - df_density["Price"].shift(1)) / 0.01 * df_density["Strike"]
 df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(0.01, 2)
 df_density["Density"] = df_density["Density"] / df_density["Density"].sum() * 100
 df_density["Gamma Strike"] = df_density.apply(lambda x: black_scholes.BS_Gamma_Strike(f=100, k=x["Strike"], t=1, v=x["IV"], df=1, OptType="C"), axis=1)
 df_density["Density Bis"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum() * 100
+
+# Gaussian Density Comparison
+mean, std = np.mean(df_density["Strike"]), np.std(df_density["Strike"])
+rvs = np.linspace(mean - 3*std, mean + 3*std, 100)
+pdf = norm.pdf(rvs, mean, std)
 
 # Results (dataframes + graphs)
 print(df_mkt)
@@ -53,11 +58,31 @@ plt.plot(df_density["Strike"], df_density["Density Bis"])
 plt.title("Density (Gamma Strike)")
 plt.grid()
 plt.show()
-plt.plot(df_density["Strike"], df_density["Cummulative Distribution"])
-plt.title("Cummulative Distribution (Empirical)")
-plt.grid()
-plt.show()
 plt.plot(df_density["Strike"], df_density["Density"])
 plt.title("Density (Empirical)")
 plt.grid()
 plt.show()
+plt.plot(rvs, pdf, c="g", label="Normal Distribution (PDF)")
+plt.title("Normal Distribution")
+plt.grid()
+plt.show()
+
+# --------------------------- Q2 : Metropolis–Hastings algorithm ---------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
