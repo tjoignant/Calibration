@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 from scipy.stats import norm
 
+import svi
 import black_scholes
 
 # Set Pandas Display Settings
@@ -20,70 +21,90 @@ df_mkt["Price (6M)"] = [10.71, 8.28, 6.91, 6.36, 5.29, 5.07, 4.76, 4.47, 4.35, 4
 df_mkt["Price (9M)"] = [11.79, 8.95, 8.07, 7.03, 6.18, 6.04, 5.76, 5.50, 5.50, 5.39]
 df_mkt["Price (12M)"] = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
 
-# Compute Option's Implied Volatility
+# Compute Option's Implied Volatility (IV), Total Variance (TV), Log Forward Moneyness (LFM)
 for maturity in [3, 6, 9, 12]:
     df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
         lambda x: black_scholes.BS_IV_Newton_Raphson(
-            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity/12, OptType="C")[0], axis=1)
+            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
-# --------------------------- Q1 : RISK NEUTRAL DENSITY ---------------------------
-# Create Risk Neutral Density Dataframe (12M)
-f2 = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
+# --------------------------- PART 1 : RISK NEUTRAL DENSITY ---------------------------
+
+# Calibrate Interpolation Function
+interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
+
+# Create Interpolated Risk Neutral Density Dataframe
 df_density = pd.DataFrame()
-df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.005)
-df_density["IV"] = f2(df_density["Strike"])
+df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.05)
+df_density["IV"] = df_density.apply(lambda x: interp_function(x["Strike"]), axis=1)
 df_density["Price"] = df_density.apply(
-    lambda x: black_scholes.BS_Price(df=1, f=100, k=x[ "Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
-df_density["Cummulative Distribution"] = 1 + (df_density["Price"].shift(-1) - df_density["Price"].shift(1)) / 0.01 * df_density["Strike"]
-df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(0.01, 2)
-df_density["Density"] = df_density["Density"] / df_density["Density"].sum() * 100
-df_density["Gamma Strike"] = df_density.apply(lambda x: black_scholes.BS_Gamma_Strike(f=100, k=x["Strike"], t=1, v=x["IV"], df=1, OptType="C"), axis=1)
-df_density["Density Bis"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum() * 100
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
+df_density["Gamma Strike"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(
+    0.01, 2)
+df_density["Density"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum()
+
+# Plot & Save Graph: Interpolated Volatilities
+fig1, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs1.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
+axs1.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
+axs1.grid()
+axs1.legend()
+fig1.savefig('results/1.1_Interpolated_Volatilities.png')
+
+# Plot & Save Graph: Interpolated Volatilities
+fig2, axs2 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs2.plot(df_density["Strike"], df_density["Density"], label="Interpolated")
+axs2.grid()
+fig2.savefig('results/1.2_Interpolated_Density.png')
+
+# Compute Total Variance (TV) & Log Forward Moneyness (LFM)
+df_density["TV"] = df_density["IV"] * df_density["IV"] * 1
+df_density["LFM"] = df_density.apply(lambda x: np.log(x["Strike"] / 100), axis=1)
+
+# Calibrate SVI Curve
+SVI_params = svi.SVI_calibration(k_list=df_density["LFM"], mktTotVar_list=df_density["TV"],
+                             weights_list=df_density["IV"] * df_density["IV"], use_durrleman_cond=True)
+
+# Compute SVI Volatilities
+df_density["IV (SVI)"] = df_density.apply(
+    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"], rho_=SVI_params["rho_"],
+                        m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+
+# Plot & Save Graph: SVI Calibration
+fig3, axs3 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs3.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
+axs3.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
+axs3.plot(df_density["Strike"], df_density["IV (SVI)"], label="SVI")
+axs3.grid()
+axs3.legend()
+fig3.savefig('results/1.3_SVI_Calibration.png')
+
+# Create Interpolated/Extrapolated Risk Neutral Density Dataframe (12M)
+df_density_bis = pd.DataFrame()
+df_density_bis["Strike"] = np.arange(70, 130, 0.1)
+df_density_bis["IV (SVI)"] = df_density_bis.apply(
+    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"], rho_=SVI_params["rho_"],
+                        m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+
+# Compute Option Price Continuum
+df_density_bis["Price (SVI)"] = df_density_bis.apply(
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV (SVI)"], OptType="C"), axis=1)
+
+# Compute SVI Breeden-Litzenberger Density
+df_density_bis["Gamma Strike (SVI)"] = (df_density_bis["Price (SVI)"].shift(1) - 2 * df_density_bis["Price (SVI)"] + df_density_bis["Price (SVI)"].shift(-1)) / pow(
+    0.01, 2)
+df_density_bis["Density (SVI)"] = df_density_bis["Gamma Strike (SVI)"] / df_density_bis["Gamma Strike (SVI)"].sum()
 
 # Gaussian Density Comparison
-mean, std = np.mean(df_density["Strike"]), np.std(df_density["Strike"])
-rvs = np.linspace(mean - 3*std, mean + 3*std, 100)
-pdf = norm.pdf(rvs, mean, std)
+df_density_bis["Gaussian Distrib"] = norm.pdf(df_density_bis["Strike"], 99.8, 6.9)
+df_density_bis["Density (Gaussian)"] = df_density_bis["Gaussian Distrib"] / df_density_bis["Gaussian Distrib"].sum()
 
+# Plot & Save Graph: Extrapolated Density
+fig4, axs4 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs4.plot(df_density_bis["Strike"], df_density_bis["Density (SVI)"], label="SVI")
+axs4.plot(df_density_bis["Strike"], df_density_bis["Density (Gaussian)"], c="g", label="Gaussian")
+axs4.grid()
+axs4.legend()
+fig4.savefig('results/1.4_SVI_Density.png')
 
-# Results (dataframes + graphs)
-print(df_mkt)
-print(df_density)
-plt.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
-plt.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
-plt.title("Volatilities")
-plt.grid()
-plt.legend()
+# Display Graphs
 plt.show()
-plt.plot(df_density["Strike"], df_density["Density Bis"])
-plt.title("Density (Gamma Strike)")
-plt.grid()
-plt.show()
-plt.plot(df_density["Strike"], df_density["Density"])
-plt.title("Density (Empirical)")
-plt.grid()
-plt.show()
-plt.plot(rvs, pdf, c="g", label="Normal Distribution (PDF)")
-plt.title("Normal Distribution")
-plt.grid()
-plt.show()
-
-# --------------------------- Q2 : Metropolis–Hastings algorithm ---------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
