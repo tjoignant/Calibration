@@ -6,6 +6,7 @@ from scipy.interpolate import interp1d
 from scipy.stats import norm
 
 import svi
+import utils
 import black_scholes
 
 # Report Link : https://www.overleaf.com/project/639051dcb072f741700fb0f1
@@ -33,20 +34,23 @@ for maturity in [3, 6, 9, 12]:
 
 # Calibrate Interpolation Function
 interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
+my_interp_function = utils.Interp(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
 
 # Create Interpolated Risk Neutral Density Dataframe
 df_density = pd.DataFrame()
 df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.05)
 df_density["IV"] = df_density.apply(lambda x: interp_function(x["Strike"]), axis=1)
+df_density["IV (2D)"] = df_density.apply(lambda x: my_interp_function.get_image(x["Strike"]), axis=1)
 df_density["Price"] = df_density.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
-df_density["Gamma Strike"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) / pow(
-    0.01, 2)
+df_density["Gamma Strike"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) \
+                             / pow(0.01, 2)
 df_density["Density"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum()
 
 # Plot & Save Graph: Interpolated Volatilities
 fig1, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs1.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
+axs1.plot(df_density["Strike"], df_density["IV (2D)"], label="Interpolated (2D)")
+axs1.plot(df_density["Strike"], df_density["IV"], label="Interpolated (3D)")
 axs1.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
 axs1.grid()
 axs1.legend()
@@ -64,12 +68,12 @@ df_density["LFM"] = df_density.apply(lambda x: np.log(x["Strike"] / 100), axis=1
 
 # Calibrate SVI Curve
 SVI_params = svi.SVI_calibration(k_list=df_density["LFM"], mktTotVar_list=df_density["TV"],
-                             weights_list=df_density["IV"] * df_density["IV"], use_durrleman_cond=True)
+                                 weights_list=df_density["IV"] * df_density["IV"], use_durrleman_cond=True)
 
 # Compute SVI Volatilities
 df_density["IV (SVI)"] = df_density.apply(
-    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"], rho_=SVI_params["rho_"],
-                        m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
+                              rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
 
 # Plot & Save Graph: SVI Calibration
 fig3, axs3 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
@@ -84,16 +88,16 @@ fig3.savefig('results/1.3_SVI_Calibration.png')
 df_density_bis = pd.DataFrame()
 df_density_bis["Strike"] = np.arange(70, 130, 0.1)
 df_density_bis["IV (SVI)"] = df_density_bis.apply(
-    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"], rho_=SVI_params["rho_"],
-                        m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
+                              rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
 
 # Compute Option Price Continuum
 df_density_bis["Price (SVI)"] = df_density_bis.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV (SVI)"], OptType="C"), axis=1)
 
 # Compute SVI Breeden-Litzenberger Density
-df_density_bis["Gamma Strike (SVI)"] = (df_density_bis["Price (SVI)"].shift(1) - 2 * df_density_bis["Price (SVI)"] + df_density_bis["Price (SVI)"].shift(-1)) / pow(
-    0.01, 2)
+df_density_bis["Gamma Strike (SVI)"] = (df_density_bis["Price (SVI)"].shift(1) - 2 * df_density_bis["Price (SVI)"] +
+                                        df_density_bis["Price (SVI)"].shift(-1)) / pow(0.01, 2)
 df_density_bis["Density (SVI)"] = df_density_bis["Gamma Strike (SVI)"] / df_density_bis["Gamma Strike (SVI)"].sum()
 
 # Gaussian Density Comparison
