@@ -8,6 +8,7 @@ from scipy.interpolate import interp1d
 
 import svi
 import utils
+import models
 import black_scholes
 
 # Report Link : https://www.overleaf.com/project/639051dcb072f741700fb0f1
@@ -143,7 +144,26 @@ df_local_vol["Maturity Interp"] = df_local_vol.apply(lambda x:
 df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
 interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
 BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
+print(f"IV Vol: {interp_function(99.5)}")
 print(f"BS Price: {BS_price}")
+
+# Create Interpolated Local volatilities Dataframe
+my_interp_function = utils.Interp(x_list=df_local_vol["Strike"], y_list=df_local_vol["IV (8M)"])
+df_local_vol_bis = pd.DataFrame()
+df_local_vol_bis["Strike"] = np.arange(min(df_local_vol["Strike"]), max(df_local_vol["Strike"]), 0.05)
+df_local_vol_bis["IV (2D)"] = df_local_vol_bis.apply(lambda x: my_interp_function.get_image(x=x["Strike"]), axis=1)
+df_local_vol_bis["IV"] = df_local_vol_bis.apply(lambda x: interp_function(x["Strike"]), axis=1)
+
+# Plot & Save Graph: Interpolated Volatilities (8M)
+fig6, axs6 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs6.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV (2D)"], label="Interpolated Strike (2D)")
+axs6.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV"], label="Interpolated Strike (3D)")
+axs6.scatter(df_local_vol["Strike"], df_local_vol["IV (8M)"], label="Interpolated Maturity (3D)")
+axs6.grid()
+axs6.set_xlabel("Strike")
+axs6.set_ylabel("IV")
+axs6.legend()
+fig6.savefig('results/1.6_Interpolated_Volatilities_8M.png')
 
 # Display Graphs
 plt.show()
