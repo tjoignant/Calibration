@@ -13,7 +13,7 @@ def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: floa
     Outputs:
      - S          : asset prices over time (2D array)
     """
-    nb_steps = maturity * 252
+    nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
     Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
@@ -22,12 +22,12 @@ def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: floa
     return S
 
 
-def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=100000):
+def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=25000):
     """
     Inputs:
      - S0         : initial asset spot (float)
      - sigma0     : initial volatility (perc)
-     - gamma      : elasticity variance (perc)
+     - gamma      : constant elasticity variance (perc)
      - drift      : asset yearly drift (perc)
      - maturity   : duration of simulation (float)
      - nb_steps   : number of time steps (int)
@@ -35,7 +35,7 @@ def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: floa
     Outputs:
      - S          : asset prices over time (2D array)
     """
-    nb_steps = maturity * 252
+    nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
     Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
@@ -60,7 +60,7 @@ def heston_sim(S0, v0, drift, maturity, rho, kappa, theta, sigma, nb_simuls=1000
      - asset prices over time (2D array)
      - variance over time (2D array)
     """
-    nb_steps = maturity * 252
+    nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     mu = np.array([0, 0])
     cov = np.array([[1, rho], [rho, 1]])

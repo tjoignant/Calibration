@@ -6,6 +6,7 @@ from scipy.stats import norm
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
+import cev
 import svi
 import utils
 import models
@@ -144,8 +145,9 @@ df_local_vol["Maturity Interp"] = df_local_vol.apply(lambda x:
 df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
 interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
 BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
-print(f"IV Vol: {interp_function(99.5)}")
-print(f"BS Price: {BS_price}")
+print(f"\nBlack-Scholes:")
+print(f" - Implied Vol: {interp_function(99.5)}")
+print(f" - Price: {BS_price}")
 
 # Create Interpolated Local volatilities Dataframe
 my_interp_function = utils.Interp(x_list=df_local_vol["Strike"], y_list=df_local_vol["IV (8M)"])
@@ -164,6 +166,24 @@ axs6.set_xlabel("Strike")
 axs6.set_ylabel("IV")
 axs6.legend()
 fig6.savefig('results/1.6_Interpolated_Volatilities_8M.png')
+
+# CEV Calibration (fixed gamma=1)
+df_cev = df_mkt
+mktPrice_list = list(df_cev["Price (3M)"]) + list(df_cev["Price (6M)"]) + list(df_cev["Price (9M)"]) \
+                + list(df_cev["Price (12M)"])
+strike_list = list(df_cev["Strike"]) + list(df_cev["Strike"]) + list(df_cev["Strike"]) + list(df_cev["Strike"])
+maturity_list = [3/12 for _ in list(df_cev["Price (3M)"])] + [6/12 for _ in list(df_cev["Price (6M)"])] + \
+                [9/12 for _ in list(df_cev["Price (9M)"])] + [12/12 for _ in list(df_cev["Price (12M)"])]
+impVol_list = list(df_cev["IV (3M)"]) + list(df_cev["IV (6M)"]) + list(df_cev["IV (9M)"]) \
+                + list(df_cev["IV (12M)"])
+forward_list = [100 for _ in mktPrice_list]
+df_list = [1 for _ in mktPrice_list]
+option_type_list = ["C" for _ in mktPrice_list]
+CEV_params = cev.CEV_calibration_sigma(mktPrice_list=mktPrice_list, impVol_list=impVol_list, strike_list=strike_list,
+                                       maturity_list=maturity_list, forward_list=forward_list, df_list=df_list,
+                                       option_type_list=option_type_list, gamma_=1)
+print(CEV_params)
+
 
 # Display Graphs
 plt.show()

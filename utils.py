@@ -17,7 +17,6 @@ class Interp:
         return a * pow(x, 2) + b * x + c
 
     def __compute_coefs(self):
-        matrix = []
         # Compute V
         V = []
         for i in range(1, self.n):
@@ -27,6 +26,7 @@ class Interp:
         while len(V) < 3 * (self.n - 1):
             V.append(0)
         # Compute M
+        matrix = []
         # P_i+1 = f(x_i+1)
         for i in range(0, self.n - 1):
             row = []
