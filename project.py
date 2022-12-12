@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 
+from matplotlib import cm
+from scipy.stats import norm
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
-from scipy.stats import norm
 
 import svi
 import utils
@@ -53,6 +54,8 @@ axs1.plot(df_density["Strike"], df_density["IV (2D)"], label="Interpolated (2D)"
 axs1.plot(df_density["Strike"], df_density["IV"], label="Interpolated (3D)")
 axs1.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
 axs1.grid()
+axs1.set_xlabel("Strike")
+axs1.set_ylabel("IV")
 axs1.legend()
 fig1.savefig('results/1.1_Interpolated_Volatilities.png')
 
@@ -60,6 +63,8 @@ fig1.savefig('results/1.1_Interpolated_Volatilities.png')
 fig2, axs2 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
 axs2.plot(df_density["Strike"], df_density["Density"], label="Interpolated")
 axs2.grid()
+axs2.set_xlabel("Strike")
+axs2.set_ylabel("Density")
 fig2.savefig('results/1.2_Interpolated_Density.png')
 
 # Compute Total Variance (TV) & Log Forward Moneyness (LFM)
@@ -81,6 +86,8 @@ axs3.plot(df_density["Strike"], df_density["IV"], label="Interpolated")
 axs3.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
 axs3.plot(df_density["Strike"], df_density["IV (SVI)"], label="SVI")
 axs3.grid()
+axs3.set_xlabel("Strike")
+axs3.set_ylabel("IV")
 axs3.legend()
 fig3.savefig('results/1.3_SVI_Calibration.png')
 
@@ -109,8 +116,34 @@ fig4, axs4 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
 axs4.plot(df_density_bis["Strike"], df_density_bis["Density (SVI)"], label="SVI")
 axs4.plot(df_density_bis["Strike"], df_density_bis["Density (Gaussian)"], c="g", label="Gaussian")
 axs4.grid()
+axs4.set_xlabel("Strike")
+axs4.set_ylabel("Density")
 axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
+
+
+# --------------------------- PART 2 : LOCAL VOLATILITY ---------------------------
+# Plot & Save Graph: Volatility Surface
+fig5 = plt.figure(figsize=(15, 7.5))
+axs5 = fig5.add_subplot(1, 1, 1, projection='3d')
+X, Y = np.meshgrid(df_mkt["Strike"], [3, 6, 9, 12])
+Z = np.array([np.array(df_mkt["IV (3M)"]), np.array(df_mkt["IV (6M)"]),
+              np.array(df_mkt["IV (9M)"]), np.array(df_mkt["IV (12M)"])])
+surf = axs5.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+axs5.set_xlabel("Strike")
+axs5.set_ylabel("Maturity")
+axs5.set_zlabel("IV")
+fig5.savefig('results/1.5_Volatility_Surface.png')
+
+# Compute New Option BS Price (K=99.5, T=8M)
+df_local_vol = df_mkt
+df_local_vol["Maturity Interp"] = df_local_vol.apply(lambda x:
+                                            interp1d(x=[3, 6, 9, 12], y=[x[f"IV ({matu}M)"] for matu in [3, 6, 9, 12]],
+                                                     kind='cubic'), axis=1)
+df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
+interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
+BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
+print(f"BS Price: {BS_price}")
 
 # Display Graphs
 plt.show()
