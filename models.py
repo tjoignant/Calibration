@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: float, nb_simuls=100000):
+def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: float, nb_simuls=1000, seed=1):
     """
     Inputs:
      - S0         : initial asset spot (float)
@@ -13,6 +13,7 @@ def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: floa
     Outputs:
      - S          : asset prices over time (2D array)
     """
+    np.random.seed(seed)
     nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
@@ -22,7 +23,7 @@ def black_scholes_sim(S0: float, volatility: float, drift: float, maturity: floa
     return S
 
 
-def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=25000):
+def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=1000, seed=1):
     """
     Inputs:
      - S0         : initial asset spot (float)
@@ -35,6 +36,7 @@ def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: floa
     Outputs:
      - S          : asset prices over time (2D array)
     """
+    np.random.seed(seed)
     nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
@@ -44,7 +46,7 @@ def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: floa
     return S
 
 
-def heston_sim(S0, v0, drift, maturity, rho, kappa, theta, sigma, nb_simuls=100000):
+def heston_sim(S0, v0, drift, maturity, rho, kappa, theta, sigma, nb_simuls=1000, seed=1):
     """
     Inputs:
      - S0, v0    : initial asset spot and variance (float)
@@ -60,6 +62,7 @@ def heston_sim(S0, v0, drift, maturity, rho, kappa, theta, sigma, nb_simuls=1000
      - asset prices over time (2D array)
      - variance over time (2D array)
     """
+    np.random.seed(seed)
     nb_steps = int(maturity * 252)
     dt = maturity / nb_steps
     mu = np.array([0, 0])

@@ -10,6 +10,7 @@ import cev
 import svi
 import utils
 import models
+import optimization
 import black_scholes
 
 # Report Link : https://www.overleaf.com/project/639051dcb072f741700fb0f1
@@ -123,6 +124,7 @@ axs4.set_ylabel("Density")
 axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
 
+"""
 # --------------------------- PART 1.2 : METROPOLIS HASTINGS ALGORITHM ------------
 def target_distrib(x):
     return black_scholes.BS_Gamma_Strike(df=1, f=100, k=x, t=1, v=my_interp_function.get_image(x), OptType="C")
@@ -150,8 +152,9 @@ axs76.hist(x, density = True, bins=50, color='blue', label="Density")
 axs76.grid()
 axs76.set_xlabel("Strike")
 axs76.set_ylabel("Density")
-
 plt.show()
+"""
+
 # --------------------------- PART 2 : LOCAL VOLATILITY ---------------------------
 # Plot & Save Graph: Volatility Surface
 fig5 = plt.figure(figsize=(15, 7.5))
@@ -196,23 +199,23 @@ axs6.legend()
 fig6.savefig('results/1.6_Interpolated_Volatilities_8M.png')
 
 # CEV Calibration (fixed gamma=1)
-df_cev = df_mkt
-mktPrice_list = list(df_cev["Price (3M)"]) + list(df_cev["Price (6M)"]) + list(df_cev["Price (9M)"]) \
-                + list(df_cev["Price (12M)"])
-strike_list = list(df_cev["Strike"]) + list(df_cev["Strike"]) + list(df_cev["Strike"]) + list(df_cev["Strike"])
-maturity_list = [3/12 for _ in list(df_cev["Price (3M)"])] + [6/12 for _ in list(df_cev["Price (6M)"])] + \
-                [9/12 for _ in list(df_cev["Price (9M)"])] + [12/12 for _ in list(df_cev["Price (12M)"])]
-impVol_list = list(df_cev["IV (3M)"]) + list(df_cev["IV (6M)"]) + list(df_cev["IV (9M)"]) \
-                + list(df_cev["IV (12M)"])
-forward_list = [100 for _ in mktPrice_list]
-df_list = [1 for _ in mktPrice_list]
-option_type_list = ["C" for _ in mktPrice_list]
-"""
-CEV_params = cev.CEV_calibration_sigma(mktPrice_list=mktPrice_list, impVol_list=impVol_list, strike_list=strike_list,
-                                       maturity_list=maturity_list, forward_list=forward_list, df_list=df_list,
-                                       option_type_list=option_type_list, gamma_=1)
-print(CEV_params)
-"""
+# CEV Calibration
+
+
+# --------------------------- PART 3 : ALGORITHMES D’OPTIMISATION ---------------------------
+# Set Inputs List
+mktPrice_list = list(df_mkt["Price (3M)"]) + list(df_mkt["Price (6M)"]) + list(df_mkt["Price (9M)"]) \
+                + list(df_mkt["Price (12M)"])
+strike_list = list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"])
+maturity_list = [3/12 for _ in list(df_mkt["Price (3M)"])] + [6/12 for _ in list(df_mkt["Price (6M)"])] + \
+                [9/12 for _ in list(df_mkt["Price (9M)"])] + [12/12 for _ in list(df_mkt["Price (12M)"])]
+inputs_list = []
+for i in range(0, len(mktPrice_list)):
+    inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
+
+# Estimate CEV Params (Nelder-Mead)
+nelder_mead_params, nb_iter = optimization.CEV_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+print(nelder_mead_params)
 
 # Display Graphs
 plt.show()
