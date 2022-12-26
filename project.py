@@ -123,7 +123,35 @@ axs4.set_ylabel("Density")
 axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
 
+# --------------------------- PART 1.2 : METROPOLIS HASTINGS ALGORITHM ------------
+def target_distrib(x):
+    return black_scholes.BS_Gamma_Strike(df=1, f=100, k=x, t=1, v=my_interp_function.get_image(x), OptType="C")
 
+N = 100000
+x = np.arange(N, dtype=np.float)
+
+x[0] = 100
+counter = 0
+for i in range(0, N - 1):
+    if i % 10000 == 0:
+        print(i)
+    x_next = np.random.normal(x[i], 1)
+    if np.random.random_sample() < min(1, target_distrib(x_next) / target_distrib(x[i])):
+        x[i + 1] = x_next
+        counter = counter + 1
+    else:
+        x[i + 1] = x[i]
+
+print("acceptance fraction is ", counter / float(N))
+
+# Plot & Save Graph: Interpolated Volatilities
+fig76, axs76 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs76.hist(x, density = True, bins=50, color='blue', label="Density")
+axs76.grid()
+axs76.set_xlabel("Strike")
+axs76.set_ylabel("Density")
+
+plt.show()
 # --------------------------- PART 2 : LOCAL VOLATILITY ---------------------------
 # Plot & Save Graph: Volatility Surface
 fig5 = plt.figure(figsize=(15, 7.5))
@@ -179,11 +207,12 @@ impVol_list = list(df_cev["IV (3M)"]) + list(df_cev["IV (6M)"]) + list(df_cev["I
 forward_list = [100 for _ in mktPrice_list]
 df_list = [1 for _ in mktPrice_list]
 option_type_list = ["C" for _ in mktPrice_list]
+"""
 CEV_params = cev.CEV_calibration_sigma(mktPrice_list=mktPrice_list, impVol_list=impVol_list, strike_list=strike_list,
                                        maturity_list=maturity_list, forward_list=forward_list, df_list=df_list,
                                        option_type_list=option_type_list, gamma_=1)
 print(CEV_params)
-
+"""
 
 # Display Graphs
 plt.show()
