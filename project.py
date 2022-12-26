@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 
+
 from matplotlib import cm
 from scipy.stats import norm
+import scipy.stats as stats
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
@@ -124,13 +126,16 @@ axs4.set_ylabel("Density")
 axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
 
-"""
+
 # --------------------------- PART 1.2 : METROPOLIS HASTINGS ALGORITHM ------------
-def target_distrib(x):
-    return black_scholes.BS_Gamma_Strike(df=1, f=100, k=x, t=1, v=my_interp_function.get_image(x), OptType="C")
+#We calibrated a gaussian density N (99.8, 6.9), we will therefore use these parameters in the algo
+def target_distrib(x, mu, sigma):
+    numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
+    denominator = sigma * np.sqrt(2 * np.pi)
+    return numerator / denominator
 
 N = 100000
-x = np.arange(N, dtype=np.float)
+x = np.arange(N, dtype=float)
 
 x[0] = 100
 counter = 0
@@ -138,7 +143,7 @@ for i in range(0, N - 1):
     if i % 10000 == 0:
         print(i)
     x_next = np.random.normal(x[i], 1)
-    if np.random.random_sample() < min(1, target_distrib(x_next) / target_distrib(x[i])):
+    if np.random.random_sample() < min(1, target_distrib(x_next, 99.8, 6.9) / target_distrib(x[i], 99.8, 6.9)):
         x[i + 1] = x_next
         counter = counter + 1
     else:
@@ -146,14 +151,14 @@ for i in range(0, N - 1):
 
 print("acceptance fraction is ", counter / float(N))
 
-# Plot & Save Graph: Interpolated Volatilities
+# Plot Graph: Histogram of x
 fig76, axs76 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
 axs76.hist(x, density = True, bins=50, color='blue', label="Density")
 axs76.grid()
 axs76.set_xlabel("Strike")
 axs76.set_ylabel("Density")
 plt.show()
-"""
+
 
 # --------------------------- PART 2 : LOCAL VOLATILITY ---------------------------
 # Plot & Save Graph: Volatility Surface
