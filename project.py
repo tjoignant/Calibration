@@ -98,7 +98,7 @@ fig3.savefig('results/1.3_SVI_Calibration.png')
 
 # Create Interpolated/Extrapolated Risk Neutral Density Dataframe (12M)
 df_density_bis = pd.DataFrame()
-df_density_bis["Strike"] = np.arange(70, 130, 0.1)
+df_density_bis["Strike"] = np.arange(65, 135, 0.1)
 df_density_bis["IV (SVI)"] = df_density_bis.apply(
     lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
                               rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
@@ -128,11 +128,19 @@ fig4.savefig('results/1.4_SVI_Density.png')
 
 
 # --------------------------- PART 1.2 : METROPOLIS HASTINGS ALGORITHM ------------
-#We calibrated a gaussian density N (99.8, 6.9), we will therefore use these parameters in the algo
-def target_distrib(x, mu, sigma):
-    numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
-    denominator = sigma * np.sqrt(2 * np.pi)
-    return numerator / denominator
+
+def target_distrib(x):
+    # We calibrated a gaussian density N (99.8, 6.9), we will therefore use these parameters in the algo
+    if not 66 < x < 134:
+        mu = 99.8
+        sigma = 6.9
+        numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
+        denominator = sigma * np.sqrt(2 * np.pi)
+        target = numerator / denominator
+    else:
+        interp_function = interp1d(x=df_density_bis["Strike"], y=df_density_bis["Density (SVI)"], kind='cubic')
+        target = interp_function(x)
+    return target
 
 N = 100000
 x = np.arange(N, dtype=float)
@@ -143,7 +151,8 @@ for i in range(0, N - 1):
     if i % 10000 == 0:
         print(i)
     x_next = np.random.normal(x[i], 1)
-    if np.random.random_sample() < min(1, target_distrib(x_next, 99.8, 6.9) / target_distrib(x[i], 99.8, 6.9)):
+    #if np.random.random_sample() < min(1, target_distrib(x_next, 99.8, 6.9) / target_distrib(x[i], 99.8, 6.9)):
+    if np.random.random_sample() < min(1, target_distrib(x_next) / target_distrib(x[i])):
         x[i + 1] = x_next
         counter = counter + 1
     else:
@@ -153,7 +162,7 @@ print("acceptance fraction is ", counter / float(N))
 
 # Plot Graph: Histogram of x
 fig76, axs76 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs76.hist(x, density = True, bins=50, color='blue', label="Density")
+axs76.hist(x, density=True, bins=50, color='blue', label="Density")
 axs76.grid()
 axs76.set_xlabel("Strike")
 axs76.set_ylabel("Density")
