@@ -1,5 +1,6 @@
 import models
 import numpy as np
+import copy
 
 MAX_ITERS = 1000
 MAX_ERROR = pow(10, -5)
@@ -148,3 +149,38 @@ def CEV_nelder_mead(inputs_list: list, mktPrice_list: list):
         # Update Nb Iter
         nb_iter = nb_iter + 1
     return list(solver.keys())[0], nb_iter
+
+
+# particle class
+class Particle:
+    def __init__(self, score, d, lowx, uppx, seed):
+        """
+        :param self: this Particle
+        :param score: score function, i.e. CEV_minimisation_function
+        :param d: dimension
+        :param lowx: lower bound
+        :param uppx: upper bound
+        :param seed: seed for random
+        :return: new Particle
+        """
+        self.rnd = np.random.Random(seed)
+        # initialize position of the particle with 0.0 value
+        self.position = [0.0 for i in range(d)]
+        # initialize velocity of the particle with 0.0 value
+        self.velocity = [0.0 for i in range(d)]
+        # initialize best particle position of the particle with 0.0 value
+        self.best_particle_position = [0.0 for i in range(d)]
+        # loop dim times to calculate random position and velocity
+        # range of position and velocity is [lowx, uppx]
+        for i in range(d):
+            self.position[i] = ((uppx - lowx) *
+                                self.rnd.random() + lowx)
+            self.velocity[i] = ((uppx - lowx) *
+                                self.rnd.random() + lowx)
+        # compute score of particle
+        self.score = score(self.position)  # curr fitness
+        # initialize best position and score of this particle
+        self.best_particle_position = copy.copy(self.position)
+        self.best_particle_score = self.score  # best fitness
+
+
