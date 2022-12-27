@@ -21,6 +21,9 @@ pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 300)
 pd.set_option('display.expand_frame_repr', False)
 
+# Set Numpy Seed
+np.random.seed(1)
+
 # Set Market Options DataFrame
 df_mkt = pd.DataFrame()
 df_mkt["Strike"] = np.arange(95, 105, 1)
@@ -34,7 +37,6 @@ for maturity in [3, 6, 9, 12]:
     df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
-
 
 # ---------------------------------------- PART 1.1 : RISK NEUTRAL DENSITY ----------------------------------------
 # Calibrate Interpolation Function
@@ -125,7 +127,6 @@ axs4.set_ylabel("Density")
 axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
 
-
 # ------------------------------------- PART 1.2 : METROPOLIS-HASTINGS ALGORITHM -------------------------------------
 # Set PI Function Values
 pi_x = df_density_bis["Strike"].values[1:-1]
@@ -134,6 +135,7 @@ pi_y = df_density_bis["Density (SVI)"].values[1:-1]
 
 # Target Distribution Function
 def target_distrib(x, pi_x, pi_y, mu, sigma):
+    output = 0
     # If x in pi_x
     if pi_x[0] <= x <= pi_x[-1]:
         # Return interpolated pi_y
@@ -148,6 +150,7 @@ def target_distrib(x, pi_x, pi_y, mu, sigma):
         output = numerator / denominator
     return output
 
+
 # Algorithm
 N = 100000
 x = np.arange(N, dtype=float)
@@ -155,7 +158,7 @@ x[0] = 100
 counter = 0
 for i in range(0, N - 1):
     x_next = np.random.normal(x[i], 1)
-    if np.random.random_sample() < min(1, target_distrib(x_next, pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9)/
+    if np.random.random_sample() < min(1, target_distrib(x_next, pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9) /
                                           target_distrib(x[i], pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9)):
         x[i + 1] = x_next
         counter = counter + 1
@@ -170,7 +173,6 @@ axs5.grid()
 axs5.set_xlabel("Strike")
 axs5.set_ylabel("Density")
 fig5.savefig('results/1.5_Metropolis_Density.png')
-
 
 # ---------------------------------------- PART 2.1 : VOLATILITY INTERPOLATION ----------------------------------------
 # Plot & Save Graph: Volatility Surface
