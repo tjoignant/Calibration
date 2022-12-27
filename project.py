@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-
 from matplotlib import cm
 from scipy.stats import norm
 import scipy.stats as stats
@@ -36,8 +35,8 @@ for maturity in [3, 6, 9, 12]:
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
-# --------------------------- PART 1 : RISK NEUTRAL DENSITY ---------------------------
 
+# ---------------------------------------- PART 1.1 : RISK NEUTRAL DENSITY ----------------------------------------
 # Calibrate Interpolation Function
 interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
 my_interp_function = utils.Interp(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
@@ -127,70 +126,73 @@ axs4.legend()
 fig4.savefig('results/1.4_SVI_Density.png')
 
 
-# --------------------------- PART 1.2 : METROPOLIS HASTINGS ALGORITHM ------------
+# ------------------------------------- PART 1.2 : METROPOLIS-HASTINGS ALGORITHM -------------------------------------
+# Set PI Function Values
+pi_x = df_density_bis["Strike"].values[1:-1]
+pi_y = df_density_bis["Density (SVI)"].values[1:-1]
 
-def target_distrib(x):
-    # We calibrated a gaussian density N (99.8, 6.9), we will therefore use these parameters in the algo
-    if not 66 < x < 134:
-        mu = 99.8
-        sigma = 6.9
+
+# Target Distribution Function
+def target_distrib(x, pi_x, pi_y, mu, sigma):
+    # If x in pi_x
+    if pi_x[0] <= x <= pi_x[-1]:
+        # Return interpolated pi_y
+        for i in range(1, len(pi_x)):
+            if pi_x[i] > x:
+                return (pi_y[i] + pi_y[i - 1]) / 2
+    # Else (tails)
+    else:
+        # Return fitted gaussian
         numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
         denominator = sigma * np.sqrt(2 * np.pi)
-        target = numerator / denominator
-    else:
-        interp_function = interp1d(x=df_density_bis["Strike"], y=df_density_bis["Density (SVI)"], kind='cubic')
-        target = interp_function(x)
-    return target
+        return numerator / denominator
 
+
+# Algorithm
 N = 100000
 x = np.arange(N, dtype=float)
-
 x[0] = 100
 counter = 0
 for i in range(0, N - 1):
-    if i % 10000 == 0:
-        print(i)
     x_next = np.random.normal(x[i], 1)
-    #if np.random.random_sample() < min(1, target_distrib(x_next, 99.8, 6.9) / target_distrib(x[i], 99.8, 6.9)):
-    if np.random.random_sample() < min(1, target_distrib(x_next) / target_distrib(x[i])):
+    if np.random.random_sample() < min(1, target_distrib(x_next, pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9)/
+                                          target_distrib(x[i], pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9)):
         x[i + 1] = x_next
         counter = counter + 1
     else:
         x[i + 1] = x[i]
+print(f"\nMetropolis-Hastings Acceptance Ratio: {counter / float(N)}")
 
-print("acceptance fraction is ", counter / float(N))
-
-# Plot Graph: Histogram of x
-fig76, axs76 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs76.hist(x, density=True, bins=50, color='blue', label="Density")
-axs76.grid()
-axs76.set_xlabel("Strike")
-axs76.set_ylabel("Density")
-plt.show()
+# Plot & Save Graph: Density of x
+fig5, axs5 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs5.hist(x, density=True, bins=50, color='blue', label="Density")
+axs5.grid()
+axs5.set_xlabel("Strike")
+axs5.set_ylabel("Density")
+fig5.savefig('results/1.5_Metropolis_Density.png')
 
 
-# --------------------------- PART 2 : LOCAL VOLATILITY ---------------------------
+# ---------------------------------------- PART 2.1 : VOLATILITY INTERPOLATION ----------------------------------------
 # Plot & Save Graph: Volatility Surface
-fig5 = plt.figure(figsize=(15, 7.5))
-axs5 = fig5.add_subplot(1, 1, 1, projection='3d')
+fig6 = plt.figure(figsize=(15, 7.5))
+axs6 = fig6.add_subplot(1, 1, 1, projection='3d')
 X, Y = np.meshgrid(df_mkt["Strike"], [3, 6, 9, 12])
 Z = np.array([np.array(df_mkt["IV (3M)"]), np.array(df_mkt["IV (6M)"]),
               np.array(df_mkt["IV (9M)"]), np.array(df_mkt["IV (12M)"])])
-surf = axs5.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-axs5.set_xlabel("Strike")
-axs5.set_ylabel("Maturity")
-axs5.set_zlabel("IV")
-fig5.savefig('results/1.5_Volatility_Surface.png')
+surf = axs6.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+axs6.set_xlabel("Strike")
+axs6.set_ylabel("Maturity")
+axs6.set_zlabel("IV")
+fig6.savefig('results/2.1_Volatility_Surface.png')
 
 # Compute New Option BS Price (K=99.5, T=8M)
 df_local_vol = df_mkt
-df_local_vol["Maturity Interp"] = df_local_vol.apply(lambda x:
-                                            interp1d(x=[3, 6, 9, 12], y=[x[f"IV ({matu}M)"] for matu in [3, 6, 9, 12]],
-                                                     kind='cubic'), axis=1)
+df_local_vol["Maturity Interp"] = df_local_vol.apply(
+    lambda x: interp1d(x=[3, 6, 9, 12], y=[x[f"IV ({matu}M)"] for matu in [3, 6, 9, 12]], kind='cubic'), axis=1)
 df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
 interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
-BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
-print(f"\nBlack-Scholes:")
+BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8 / 12, v=interp_function(99.5), df=1, OptType="C")
+print(f"\nBlack-Scholes")
 print(f" - Implied Vol: {interp_function(99.5)}")
 print(f" - Price: {BS_price}")
 
@@ -202,34 +204,41 @@ df_local_vol_bis["IV (2D)"] = df_local_vol_bis.apply(lambda x: my_interp_functio
 df_local_vol_bis["IV"] = df_local_vol_bis.apply(lambda x: interp_function(x["Strike"]), axis=1)
 
 # Plot & Save Graph: Interpolated Volatilities (8M)
-fig6, axs6 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs6.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV (2D)"], label="Interpolated Strike (2D)")
-axs6.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV"], label="Interpolated Strike (3D)")
-axs6.scatter(df_local_vol["Strike"], df_local_vol["IV (8M)"], label="Interpolated Maturity (3D)")
-axs6.grid()
-axs6.set_xlabel("Strike")
-axs6.set_ylabel("IV")
-axs6.legend()
-fig6.savefig('results/1.6_Interpolated_Volatilities_8M.png')
+fig7, axs7 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs7.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV (2D)"], label="Interpolated Strike (2D)")
+axs7.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV"], label="Interpolated Strike (3D)")
+axs7.scatter(df_local_vol["Strike"], df_local_vol["IV (8M)"], label="Interpolated Maturity (3D)")
+axs7.grid()
+axs7.set_xlabel("Strike")
+axs7.set_ylabel("IV")
+axs7.legend()
+fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
+# -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
 
 
-# --------------------------- PART 3 : ALGORITHMES D’OPTIMISATION ---------------------------
+# ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
+
+
+# ----------------------------------------- PART 3 : OPTIMISATION ALGORITHMS ------------------------------------------
 # Set Inputs List
 mktPrice_list = list(df_mkt["Price (3M)"]) + list(df_mkt["Price (6M)"]) + list(df_mkt["Price (9M)"]) \
                 + list(df_mkt["Price (12M)"])
 strike_list = list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"])
-maturity_list = [3/12 for _ in list(df_mkt["Price (3M)"])] + [6/12 for _ in list(df_mkt["Price (6M)"])] + \
-                [9/12 for _ in list(df_mkt["Price (9M)"])] + [12/12 for _ in list(df_mkt["Price (12M)"])]
+maturity_list = [3 / 12 for _ in list(df_mkt["Price (3M)"])] + [6 / 12 for _ in list(df_mkt["Price (6M)"])] + \
+                [9 / 12 for _ in list(df_mkt["Price (9M)"])] + [12 / 12 for _ in list(df_mkt["Price (12M)"])]
 inputs_list = []
 for i in range(0, len(mktPrice_list)):
     inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
 
 # Estimate CEV Params (Nelder-Mead)
 nelder_mead_params, nb_iter = optimization.CEV_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
-print(nelder_mead_params)
+print("\nNelder-Mead")
+print(f" - gamma: {nelder_mead_params[0]}")
+print(f" - sigma0: {nelder_mead_params[1]}")
+print(f" - Nb Iterations: {nb_iter}")
 
 # Display Graphs
 plt.show()

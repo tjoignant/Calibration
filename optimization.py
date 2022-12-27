@@ -145,7 +145,6 @@ def CEV_nelder_mead(inputs_list: list, mktPrice_list: list):
                     solver.update(new_points)
         # Sorting
         solver = {k: v for k, v in sorted(solver.items(), key=lambda item: item[1])}
-        # Add Nb Iter
+        # Update Nb Iter
         nb_iter = nb_iter + 1
-        print(f"{nb_iter} - {list(solver.values())[0]}")
     return list(solver.keys())[0], nb_iter
