@@ -139,14 +139,14 @@ def target_distrib(x, pi_x, pi_y, mu, sigma):
         # Return interpolated pi_y
         for i in range(1, len(pi_x)):
             if pi_x[i] > x:
-                return (pi_y[i] + pi_y[i - 1]) / 2
+                output = (pi_y[i] + pi_y[i - 1]) / 2
     # Else (tails)
     else:
         # Return fitted gaussian
         numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
         denominator = sigma * np.sqrt(2 * np.pi)
-        return numerator / denominator
-
+        output = numerator / denominator
+    return output
 
 # Algorithm
 N = 100000
