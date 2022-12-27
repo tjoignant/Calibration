@@ -140,8 +140,9 @@ def target_distrib(x, pi_x, pi_y, mu, sigma):
     if pi_x[0] <= x <= pi_x[-1]:
         # Return interpolated pi_y
         for i in range(1, len(pi_x)):
-            if pi_x[i] > x:
-                output = (pi_y[i] + pi_y[i - 1]) / 2
+            if pi_x[i-1] < x <= pi_x[i]:
+                output = (pi_y[i-1] + pi_y[i]) / 2
+                break
     # Else (tails)
     else:
         # Return fitted gaussian
@@ -164,6 +165,8 @@ for i in range(0, N - 1):
         counter = counter + 1
     else:
         x[i + 1] = x[i]
+
+# Display Acceptance Ration
 print(f"\nMetropolis-Hastings Acceptance Ratio: {counter / float(N)}")
 
 # Plot & Save Graph: Density of x
