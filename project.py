@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 from matplotlib import cm
-from scipy.stats import norm
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
@@ -28,7 +27,7 @@ df_mkt["Price (3M)"] = [8.67, 7.14, 5.98, 4.93, 4.09, 3.99, 3.43, 3.01, 2.72, 2.
 df_mkt["Price (6M)"] = [10.71, 8.28, 6.91, 6.36, 5.29, 5.07, 4.76, 4.47, 4.35, 4.14]
 df_mkt["Price (9M)"] = [11.79, 8.95, 8.07, 7.03, 6.18, 6.04, 5.76, 5.50, 5.50, 5.39]
 df_mkt["Price (12M)"] = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
-
+"""
 # Compute Option's Implied Volatility (IV)
 for maturity in [3, 6, 9, 12]:
     df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
@@ -233,7 +232,7 @@ df_local_vol["Maturity Interp"] = df_local_vol.apply(
     lambda x: interp1d(x=[3, 6, 9, 12], y=[x[f"IV ({matu}M)"] for matu in [3, 6, 9, 12]], kind='cubic'), axis=1)
 df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
 interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
-BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8 / 12, v=interp_function(99.5), df=1, OptType="C")
+BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
 print(f"\nBlack-Scholes")
 print(f" - Implied Vol: {interp_function(99.5)}")
 print(f" - Price: {BS_price}")
@@ -259,7 +258,7 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 # -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
-
+"""
 
 # ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
 
@@ -275,12 +274,19 @@ inputs_list = []
 for i in range(0, len(mktPrice_list)):
     inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
 
+# Estimate CEV Params (Scipy)
+params, error, nit = optimization.CEV_calibration_scipy(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+print("\nScipy")
+print(f" - [gamma, sigma0]: {params}")
+print(f" - MSE: {error}")
+print(f" - nb iterations: {nit}")
+
 # Estimate CEV Params (Nelder-Mead)
-nelder_mead_params, nb_iter = optimization.CEV_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+params, error, nit = optimization.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
 print("\nNelder-Mead")
-print(f" - gamma: {nelder_mead_params[0]}")
-print(f" - sigma0: {nelder_mead_params[1]}")
-print(f" - Nb Iterations: {nb_iter}")
+print(f" - [gamma, sigma0]: {params}")
+print(f" - MSE: {error}")
+print(f" - nb iterations: {nit}")
 
 # Display Graphs
 plt.show()

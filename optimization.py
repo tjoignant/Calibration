@@ -1,9 +1,11 @@
+import copy
 import models
 import numpy as np
-import copy
+import scipy.optimize as optimize
 
-MAX_ITERS = 1000
-MAX_ERROR = pow(10, -5)
+
+MAX_ITER = 500
+MAX_ERROR = pow(10, -2)
 
 
 def CEV_price(k, t, f, df, OptType, gamma_, sigma0_):
@@ -32,25 +34,41 @@ def CEV_minimisation_function(params_list: list, inputs_list: list, mktPrice_lis
     return MSVE
 
 
-def CEV_nelder_mead(inputs_list: list, mktPrice_list: list):
+def CEV_calibration_scipy(inputs_list: list, mktPrice_list: list):
     """
     :param inputs_list: [(K_1, T_1, f_1, df_1, OptType_1), (K_2, T_2, f_2, df_2, OptType_2), ...]
     :param mktPrice_list: [mktPrice_1, mktPrice_2, ...]
-    :return: params_list: [gamma_, sigma0_]
+    :return: calibrated parameters dict {gamma_: sigma0_}
+    """
+    result = optimize.minimize(
+        CEV_minimisation_function,
+        x0=[0.5, 0.5],
+        method='nelder-mead',
+        args=(inputs_list, mktPrice_list),
+        tol=MAX_ERROR,
+    )
+    return list(result.x), result.fun, result.nit
+
+
+def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
+    """
+    :param inputs_list: [(K_1, T_1, f_1, df_1, OptType_1), (K_2, T_2, f_2, df_2, OptType_2), ...]
+    :param mktPrice_list: [mktPrice_1, mktPrice_2, ...]
+    :return: calibrated parameters dict {gamma_: sigma0_}
     """
     # Initialization
     nb_iter = 0
     d = 2
-    init_params = [[0.01, 0.05], [0.99, 0.7], [0.5, 0.35]]
-    # Set Initial Values, example for d=2 : {(a1, b1): x1, (a2, b2): x2, (a3, b3): x3}
+    init_params = [[0.01, 1], [1, 0.5], [0.5, 0.01]]
+    # Set Initial Solver Values, example for d=2 : {(a1, b1): x1, (a2, b2): x2, (a3, b3): x3}
     solver = {}
     for i in range(0, d + 1):
         params_list = [init_params[i][0], init_params[i][1]]
         solver[tuple(init_params[i])] = CEV_minimisation_function(params_list=params_list, inputs_list=inputs_list,
                                                                   mktPrice_list=mktPrice_list)
-    # Sorting
+    # Sorting Solver
     solver = {k: v for k, v in sorted(solver.items(), key=lambda item: item[1])}
-    while list(solver.values())[1] - list(solver.values())[0] > MAX_ERROR and nb_iter < MAX_ITERS:
+    while list(solver.values())[1] - list(solver.values())[0] > MAX_ERROR and nb_iter < MAX_ITER:
         # Compute The Barycenter (excluding d+1 params vector)
         x0 = []
         for i in range(0, d):
@@ -134,7 +152,7 @@ def CEV_nelder_mead(inputs_list: list, mktPrice_list: list):
                 # Else (xc no good) --> contracting every point towards best one
                 else:
                     new_points = {}
-                    for i in range(1, d+1):
+                    for i in range(1, d + 1):
                         new_x = []
                         for j in range(0, d):
                             new_x.append(0.5 * (list(solver.keys())[0][j] + list(solver.keys())[i][j]))
@@ -144,11 +162,11 @@ def CEV_nelder_mead(inputs_list: list, mktPrice_list: list):
                     for i in range(1, d + 1):
                         solver.pop(list(solver.keys())[-1])
                     solver.update(new_points)
-        # Sorting
+        # Sorting Solver
         solver = {k: v for k, v in sorted(solver.items(), key=lambda item: item[1])}
         # Update Nb Iter
         nb_iter = nb_iter + 1
-    return list(solver.keys())[0], nb_iter
+    return list(solver.keys())[0], list(solver.values())[0], nb_iter
 
 
 # particle class
@@ -163,7 +181,7 @@ class Particle:
         :param seed: seed for random
         :return: new Particle
         """
-        self.rnd = np.random.Random(seed)
+        self.rnd = np.random.seed(seed)
         # initialize position of the particle with 0.0 value
         self.position = [0.0 for i in range(d)]
         # initialize velocity of the particle with 0.0 value
