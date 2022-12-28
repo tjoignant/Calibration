@@ -42,7 +42,7 @@ def cev_sim(S0: float, sigma0: float, gamma: float, drift: float, maturity: floa
     S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
     Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
     for i in range(1, nb_steps + 1):
-        S[i] = S[i - 1] + S[i - 1] * drift * dt + sigma0 * pow(S[i - 1], gamma) * np.sqrt(dt) * Z[i - 1]
+        S[i] = S[i - 1] + S[i - 1] * drift * dt + sigma0 * np.power(S[i - 1], gamma) * np.sqrt(dt) * Z[i - 1]
     return S
 
 
