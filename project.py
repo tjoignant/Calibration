@@ -3,14 +3,11 @@ import pandas as pd
 
 from matplotlib import cm
 from scipy.stats import norm
-import scipy.stats as stats
 from matplotlib import pyplot as plt
 from scipy.interpolate import interp1d
 
-import cev
 import svi
 import utils
-import models
 import optimization
 import black_scholes
 
@@ -21,8 +18,8 @@ pd.set_option('display.max_rows', 100)
 pd.set_option('display.max_columns', 300)
 pd.set_option('display.expand_frame_repr', False)
 
-# Set Numpy Seed
-np.random.seed(1)
+# Set Numerical Differential Step
+step = 0.1
 
 # Set Market Options DataFrame
 df_mkt = pd.DataFrame()
@@ -32,27 +29,29 @@ df_mkt["Price (6M)"] = [10.71, 8.28, 6.91, 6.36, 5.29, 5.07, 4.76, 4.47, 4.35, 4
 df_mkt["Price (9M)"] = [11.79, 8.95, 8.07, 7.03, 6.18, 6.04, 5.76, 5.50, 5.50, 5.39]
 df_mkt["Price (12M)"] = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
 
-# Compute Option's Implied Volatility (IV), Total Variance (TV), Log Forward Moneyness (LFM)
+# Compute Option's Implied Volatility (IV)
 for maturity in [3, 6, 9, 12]:
     df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
 # ---------------------------------------- PART 1.1 : RISK NEUTRAL DENSITY ----------------------------------------
-# Calibrate Interpolation Function
+# Calibrate Interpolation Functions
 interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
 my_interp_function = utils.Interp(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
 
-# Create Interpolated Risk Neutral Density Dataframe
+# Create Interpolated Risk Neutral Density Dataframe (12M)
 df_density = pd.DataFrame()
-df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), 0.05)
+df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), step)
 df_density["IV"] = df_density.apply(lambda x: interp_function(x["Strike"]), axis=1)
 df_density["IV (2D)"] = df_density.apply(lambda x: my_interp_function.get_image(x["Strike"]), axis=1)
 df_density["Price"] = df_density.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
-df_density["Gamma Strike"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) \
-                             / pow(0.01, 2)
-df_density["Density"] = df_density["Gamma Strike"] / df_density["Gamma Strike"].sum()
+
+# Compute Breeden-Litzenberger Density
+df_density["Density"] = (df_density["Price"].shift(1) - 2 * df_density["Price"] + df_density["Price"].shift(-1)) \
+                             / pow(step, 2)
+df_density["Density Norm"] = df_density["Density"] / df_density["Density"].sum()
 
 # Plot & Save Graph: Interpolated Volatilities
 fig1, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
@@ -73,13 +72,13 @@ axs2.set_xlabel("Strike")
 axs2.set_ylabel("Density")
 fig2.savefig('results/1.2_Interpolated_Density.png')
 
-# Compute Total Variance (TV) & Log Forward Moneyness (LFM)
-df_density["TV"] = df_density["IV"] * df_density["IV"] * 1
-df_density["LFM"] = df_density.apply(lambda x: np.log(x["Strike"] / 100), axis=1)
-
 # Calibrate SVI Curve
-SVI_params = svi.SVI_calibration(k_list=df_density["LFM"], mktTotVar_list=df_density["TV"],
-                                 weights_list=df_density["IV"] * df_density["IV"], use_durrleman_cond=True)
+implied_vol = df_mkt["IV (12M)"].to_numpy()
+total_variance = np.power(implied_vol, 2)
+log_forward_moneyness = np.log(df_mkt["Strike"] / 100)
+weights = [1 for _ in implied_vol]
+SVI_params = svi.SVI_calibration(k_list=log_forward_moneyness, mktTotVar_list=total_variance, weights_list=weights,
+                                 use_durrleman_cond=False)
 
 # Compute SVI Volatilities
 df_density["IV (SVI)"] = df_density.apply(
@@ -97,44 +96,60 @@ axs3.set_ylabel("IV")
 axs3.legend()
 fig3.savefig('results/1.3_SVI_Calibration.png')
 
-# Create Interpolated/Extrapolated Risk Neutral Density Dataframe (12M)
-df_density_bis = pd.DataFrame()
-df_density_bis["Strike"] = np.arange(65, 135, 0.1)
-df_density_bis["IV (SVI)"] = df_density_bis.apply(
+# Set Custom Density Dataframe
+df_custom_density = pd.DataFrame()
+df_custom_density["Strike"] = np.arange(95, 105, step)
+df_custom_density["IV"] = df_custom_density.apply(
     lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
                               rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+df_custom_density["Price"] = df_custom_density.apply(
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
 
-# Compute Option Price Continuum
-df_density_bis["Price (SVI)"] = df_density_bis.apply(
-    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV (SVI)"], OptType="C"), axis=1)
+# Compute Breeden-Litzenberger Density
+df_custom_density["Density"] = (df_custom_density["Price"].shift(1) - 2 * df_custom_density["Price"] + df_custom_density["Price"].shift(-1)) \
+                             / pow(step, 2)
 
-# Compute SVI Breeden-Litzenberger Density
-df_density_bis["Gamma Strike (SVI)"] = (df_density_bis["Price (SVI)"].shift(1) - 2 * df_density_bis["Price (SVI)"] +
-                                        df_density_bis["Price (SVI)"].shift(-1)) / pow(0.01, 2)
-df_density_bis["Density (SVI)"] = df_density_bis["Gamma Strike (SVI)"] / df_density_bis["Gamma Strike (SVI)"].sum()
+
+def normal_pdf(x, mu, sigma):
+    return np.exp(-0.5 * np.power((x - mu) / sigma, 2)) / (sigma * np.sqrt(2 * np.pi))
+
 
 # Gaussian Density Comparison
-df_density_bis["Gaussian Distrib"] = norm.pdf(df_density_bis["Strike"], 99.8, 6.9)
-df_density_bis["Density (Gaussian)"] = df_density_bis["Gaussian Distrib"] / df_density_bis["Gaussian Distrib"].sum()
+mu = 100.94
+sigma = 1.15
+right_mu = 102.1
+right_sigma = 1.7
+left_mu = 99.5
+left_sigma = 1.9
+df_custom_density["Density (Gaussian)"] = df_custom_density["Strike"].apply(lambda x: normal_pdf(x, mu, sigma))
+df_custom_density["Right Density (Gaussian)"] = df_custom_density["Strike"].apply(lambda x: normal_pdf(x, right_mu, right_sigma))
+df_custom_density["Left Density (Gaussian)"] = df_custom_density["Strike"].apply(lambda x: normal_pdf(x, left_mu, left_sigma))
+
+# Compute Normalized Densities
+for density in ["Density", "Density (Gaussian)", "Right Density (Gaussian)", "Left Density (Gaussian)"]:
+    df_custom_density[f"Norm. {density}"] = df_custom_density[density] / df_custom_density[density].sum()
 
 # Plot & Save Graph: Extrapolated Density
 fig4, axs4 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs4.plot(df_density_bis["Strike"], df_density_bis["Density (SVI)"], label="SVI")
-axs4.plot(df_density_bis["Strike"], df_density_bis["Density (Gaussian)"], c="g", label="Gaussian")
+axs4.plot(df_custom_density["Strike"], df_custom_density["Density"], label="Custom")
+axs4.plot(df_custom_density["Strike"], df_custom_density["Density (Gaussian)"], "--", label="Centered Gaussian")
+axs4.plot(df_custom_density["Strike"], df_custom_density["Right Density (Gaussian)"], "--", label="Right Gaussian")
+axs4.plot(df_custom_density["Strike"], df_custom_density["Left Density (Gaussian)"], "--", label="Left Gaussian")
 axs4.grid()
 axs4.set_xlabel("Strike")
 axs4.set_ylabel("Density")
 axs4.legend()
-fig4.savefig('results/1.4_SVI_Density.png')
+fig4.savefig('results/1.4_Custom_Density.png')
+
 
 # ------------------------------------- PART 1.2 : METROPOLIS-HASTINGS ALGORITHM -------------------------------------
 # Set PI Function Values
-pi_x = df_density_bis["Strike"].values[1:-1]
-pi_y = df_density_bis["Density (SVI)"].values[1:-1]
+pi_x = df_custom_density["Strike"].values[1:-1]
+pi_y = df_custom_density["Density"].values[1:-1]
 
 
 # Target Distribution Function
-def target_distrib(x, pi_x, pi_y, mu, sigma):
+def target_distrib(x, pi_x, pi_y):
     output = 0
     # If x in pi_x
     if pi_x[0] <= x <= pi_x[-1]:
@@ -143,36 +158,58 @@ def target_distrib(x, pi_x, pi_y, mu, sigma):
             if pi_x[i-1] < x <= pi_x[i]:
                 output = (pi_y[i-1] + pi_y[i]) / 2
                 break
-    # Else (tails)
+    # If x in right tail
+    elif x > pi_x[-1]:
+        # Return right gaussian
+        output = normal_pdf(x, right_mu, right_sigma)
+    # If x in left tail
     else:
-        # Return fitted gaussian
-        numerator = np.exp((-(x - mu) ** 2) / (2 * sigma ** 2))
-        denominator = sigma * np.sqrt(2 * np.pi)
-        output = numerator / denominator
+        # Return left gaussian
+        output = normal_pdf(x, left_mu, left_sigma)
     return output
 
 
 # Algorithm
 N = 100000
-x = np.arange(N, dtype=float)
-x[0] = 100
+rdm_x = np.arange(N, dtype=float)
+rdm_x[0] = 100
 counter = 0
 for i in range(0, N - 1):
-    x_next = np.random.normal(x[i], 1)
-    if np.random.random_sample() < min(1, target_distrib(x_next, pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9) /
-                                          target_distrib(x[i], pi_x=pi_x, pi_y=pi_y, mu=99.8, sigma=6.9)):
-        x[i + 1] = x_next
+    x_next = np.random.normal(rdm_x[i], 1)
+    if np.random.random_sample() < min(1, target_distrib(x_next, pi_x=pi_x, pi_y=pi_y) /
+                                          target_distrib(rdm_x[i], pi_x=pi_x, pi_y=pi_y)):
+        rdm_x[i + 1] = x_next
         counter = counter + 1
     else:
-        x[i + 1] = x[i]
+        rdm_x[i + 1] = rdm_x[i]
 
 # Display Acceptance Ration
 print(f"\nMetropolis-Hastings Acceptance Ratio: {counter / float(N)}")
 
+# Compute SVI & Density Prices
+df_metropolis = pd.DataFrame()
+df_metropolis["Strike"] = np.arange(95, 105, 1)
+df_metropolis["IV"] = df_metropolis.apply(
+    lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
+                              rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
+df_metropolis["Price (SVI)"] = df_metropolis.apply(
+    lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
+
+df_metropolis["Price (Density)"] = df_metropolis.apply(
+    lambda x: np.mean(np.maximum(rdm_x - x["Strike"], 0)), axis=1)
+print(f"\n{df_metropolis}")
+
 # Plot & Save Graph: Density of x
+data_entries, bins = np.histogram(rdm_x, bins=80)
+binscenters = np.array([0.5 * (bins[i] + bins[i + 1]) for i in range(len(bins) - 1)])
+data_entries_norm = np.array(data_entries) / sum(data_entries)
+target_distrib = [target_distrib(x, pi_x=pi_x, pi_y=pi_y) for x in binscenters]
+target_distrib = target_distrib / sum(target_distrib)
 fig5, axs5 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs5.hist(x, density=True, bins=50, color='blue', label="Density")
+axs5.plot(binscenters, target_distrib, label="Target")
+axs5.plot(binscenters, data_entries_norm, label="Simulated")
 axs5.grid()
+axs5.legend()
 axs5.set_xlabel("Strike")
 axs5.set_ylabel("Density")
 fig5.savefig('results/1.5_Metropolis_Density.png')
@@ -204,7 +241,7 @@ print(f" - Price: {BS_price}")
 # Create Interpolated Local volatilities Dataframe
 my_interp_function = utils.Interp(x_list=df_local_vol["Strike"], y_list=df_local_vol["IV (8M)"])
 df_local_vol_bis = pd.DataFrame()
-df_local_vol_bis["Strike"] = np.arange(min(df_local_vol["Strike"]), max(df_local_vol["Strike"]), 0.05)
+df_local_vol_bis["Strike"] = np.arange(min(df_local_vol["Strike"]), max(df_local_vol["Strike"]), step)
 df_local_vol_bis["IV (2D)"] = df_local_vol_bis.apply(lambda x: my_interp_function.get_image(x=x["Strike"]), axis=1)
 df_local_vol_bis["IV"] = df_local_vol_bis.apply(lambda x: interp_function(x["Strike"]), axis=1)
 
