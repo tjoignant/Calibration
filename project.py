@@ -27,7 +27,7 @@ df_mkt["Price (3M)"] = [8.67, 7.14, 5.98, 4.93, 4.09, 3.99, 3.43, 3.01, 2.72, 2.
 df_mkt["Price (6M)"] = [10.71, 8.28, 6.91, 6.36, 5.29, 5.07, 4.76, 4.47, 4.35, 4.14]
 df_mkt["Price (9M)"] = [11.79, 8.95, 8.07, 7.03, 6.18, 6.04, 5.76, 5.50, 5.50, 5.39]
 df_mkt["Price (12M)"] = [12.40, 9.59, 8.28, 7.40, 6.86, 6.58, 6.52, 6.49, 6.47, 6.46]
-"""
+
 # Compute Option's Implied Volatility (IV)
 for maturity in [3, 6, 9, 12]:
     df_mkt[f"IV ({maturity}M)"] = df_mkt.apply(
@@ -258,7 +258,6 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 # -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
-"""
 
 # ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
 
