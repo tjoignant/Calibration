@@ -312,6 +312,22 @@ print(f" - [gamma, sigma0]: {params}")
 print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
 
+# Estimate CEV Params (PSO)
+# iterations
+iters = 71
+# number of particles
+particles = 5
+# dimension, in our case 2 (sigma and gamma)
+dimension = 2
+# lower and upper bound, to restrain the search area and computing warnings
+low_bound = 0.01
+upp_bound = 0.99
+params, error, nit = optimization.CEV_calibration_pso(iters, particles, dimension, low_bound, upp_bound, inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+print("\nParticle Swarm Optimization")
+print(f" - [gamma, sigma0]: {params}")
+print(f" - MSE: {error}")
+print(f" - nb iterations: {nit}")
+
 # Display Graphs
 plt.show()
 """

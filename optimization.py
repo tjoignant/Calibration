@@ -3,6 +3,11 @@ import models
 import numpy as np
 import scipy.optimize as optimize
 
+import random
+import math
+import copy
+import sys
+
 
 MAX_ITER = 500
 MAX_ERROR = pow(10, -2)
@@ -171,34 +176,117 @@ def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
 
 # particle class
 class Particle:
-    def __init__(self, score, d, lowx, uppx, seed):
+    def __init__(self, dim, lowx, uppx, seed):
         """
         :param self: this Particle
-        :param score: score function, i.e. CEV_minimisation_function
-        :param d: dimension
+        :param dim: dimension, i.e. in our case 2 since we have sigma and gamma
         :param lowx: lower bound
         :param uppx: upper bound
         :param seed: seed for random
         :return: new Particle
         """
-        self.rnd = np.random.seed(seed)
-        # initialize position of the particle with 0.0 value
-        self.position = [0.0 for i in range(d)]
-        # initialize velocity of the particle with 0.0 value
-        self.velocity = [0.0 for i in range(d)]
-        # initialize best particle position of the particle with 0.0 value
-        self.best_particle_position = [0.0 for i in range(d)]
-        # loop dim times to calculate random position and velocity
+        self.rnd = random.Random(seed)
+        # initializing position of the particle
+        self.position = [0.0 for i in range(dim)]
+        # initializing velocity of the particle
+        self.velocity = [0.0 for i in range(dim)]
+        # initializing the best particle position of the particle
+        self.best_particle_position = [0.0 for i in range(dim)]
+        # for every position parameter (in our case sigma and gamma) initialize position and velocity
         # range of position and velocity is [lowx, uppx]
-        for i in range(d):
+        for i in range(dim):
             self.position[i] = ((uppx - lowx) *
                                 self.rnd.random() + lowx)
             self.velocity[i] = ((uppx - lowx) *
                                 self.rnd.random() + lowx)
-        # compute score of particle
-        self.score = score(self.position)  # curr fitness
-        # initialize best position and score of this particle
+        # initializing score of the particle
+        self.score = 0  # score will be updated with CEV_minimisation_function
+        # initializing best position and score of this particle
         self.best_particle_position = copy.copy(self.position)
         self.best_particle_score = self.score  # best fitness
 
 
+# particle swarm optimization function
+def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPrice_list: list):
+    """
+    :param n: number of Particles in a swarm
+    :param dim: dimension, i.e. in our case 2 since we have sigma and gamma
+    :param lowx: lower bound
+    :param uppx: upper bound
+    :param inputs_list: [(K_1, T_1, f_1, df_1, OptType_1), (K_2, T_2, f_2, df_2, OptType_2), ...]
+    :param mktPrice_list: [mktPrice_1, mktPrice_2, ...]
+    :return: params_list: [gamma_, sigma0_]
+    """
+    # hyper parameters
+    w = 0.8  # inertia
+    c1 = 0.1  # cognitive (particle)
+    c2 = 0.1  # social (swarm)
+
+    rnd = random.Random(0)
+
+    # create n random particles
+    swarm = [Particle(dim, lowx, uppx, i) for i in range(n)]
+    for particle in swarm:
+        params_list = particle.position
+        particle.score = CEV_minimisation_function(params_list=params_list, inputs_list=inputs_list,
+                                                        mktPrice_list=mktPrice_list)
+        particle.best_particle_score = copy.copy(particle.score)
+
+    # compute the value of best_position and best_fitness in swarm
+    best_swarm_pos = [0.0 for i in range(dim)]
+    best_swarm_fitnessVal = 1000  # swarm best
+
+    # compute the best particle of swarm and it's fitness
+    for i in range(n):  # check each particle
+        if swarm[i].score < best_swarm_fitnessVal:
+            best_swarm_fitnessVal = swarm[i].score
+            best_swarm_pos = copy.copy(swarm[i].position)
+
+    # main loop of pso
+    iteration = 0
+    while iteration < max_iter:
+
+        # after every 10 iterations
+        # print iteration number and best fitness value so far
+        """
+        if iteration % 10 == 0 and iteration > 1:
+            print("Iter = " + str(iteration) + " best fitness = %.3f" % best_swarm_fitnessVal)
+            print(best_swarm_fitnessVal)
+        """
+        for i in range(n):  # process each particle
+
+            # compute new velocity of curr particle
+            for k in range(dim):
+                r1 = rnd.random()  # randomizations
+                r2 = rnd.random()
+                swarm[i].velocity[k] = (
+                        (w * swarm[i].velocity[k]) +
+                        (c1 * r1 * (swarm[i].best_particle_position[k] - swarm[i].position[k])) +
+                        (c2 * r2 * (best_swarm_pos[k] - swarm[i].position[k]))
+                )
+
+            # compute new position using new velocity
+            for k in range(dim):
+                swarm[i].position[k] += swarm[i].velocity[k]
+                swarm[i].position[k] = max(lowx, min(uppx, swarm[i].position[k]))
+
+            # compute fitness of new position
+            params_list_i = swarm[i].position
+            swarm[i].score = CEV_minimisation_function(params_list=params_list_i, inputs_list=inputs_list,
+                                                       mktPrice_list=mktPrice_list)
+
+            # is new position a new best for the particle?
+            if swarm[i].score < swarm[i].best_particle_score:
+                swarm[i].best_particle_score = swarm[i].score
+                swarm[i].best_particle_position = copy.copy(swarm[i].position)
+
+            # is new position a new best overall?
+            if swarm[i].score < best_swarm_fitnessVal:
+                best_swarm_fitnessVal = swarm[i].score
+                best_swarm_pos = copy.copy(swarm[i].position)
+
+        # for-each particle
+        iteration += 1
+    # end_while
+    return best_swarm_pos, best_swarm_fitnessVal, iteration
+# end pso
