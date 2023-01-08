@@ -34,7 +34,6 @@ for maturity in [3, 6, 9, 12]:
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
-"""
 # ---------------------------------------- PART 1.1 : RISK NEUTRAL DENSITY ----------------------------------------
 # Calibrate Interpolation Functions
 interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
@@ -259,10 +258,8 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 # -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
-"""
 
 # ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
-
 # Create Gamma DataFrame
 df_gamma = pd.DataFrame()
 for matu in [3, 6, 9, 12]:
@@ -286,7 +283,7 @@ print(df_gamma)
 print(df_theta)
 print(df_dupire)
 
-"""
+
 # ----------------------------------------- PART 3 : OPTIMISATION ALGORITHMS ------------------------------------------
 # Set Inputs List
 mktPrice_list = list(df_mkt["Price (3M)"]) + list(df_mkt["Price (6M)"]) + list(df_mkt["Price (9M)"]) \
@@ -330,4 +327,3 @@ print(f" - nb iterations: {nit}")
 
 # Display Graphs
 plt.show()
-"""
