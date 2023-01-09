@@ -100,20 +100,22 @@ for strike in df_dupire_vol["Strike"]:
         df_dupire_vol.loc[index, round(matu, 2)] = np.sqrt(maturity_interp.get_image(round(matu, 2)) / (matu / 12))
 df_dupire_vol.drop(["3", "6", "9", "12"], axis=1, inplace=True)
 
-# Create Interpolated Price Surface
-df_dupire_price = pd.DataFrame()
-df_dupire_price["Strike"] = df_dupire_vol["Strike"]
+# Create Tot Variance Surfacce
+df_dupire_tot_var = pd.DataFrame()
+df_dupire_tot_var["k"] = np.log(df_dupire_vol["Strike"] / 100)
 for matu in df_dupire_vol.columns[1:]:
-    df_dupire_price[matu] = df_dupire_vol.apply(lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=matu / 12, v=x[matu], OptType="C"), axis=1)
+    df_dupire_tot_var[matu] = df_dupire_vol.apply(lambda x: pow(x[matu], 2) * matu/12, axis=1)
 
 # Create Dupire Surface
 df_dupire = pd.DataFrame()
-df_dupire["Strike"] = df_dupire_price["Strike"]
-for matu in df_dupire_price.columns[1:]:
-    gamma = (df_dupire_price[matu].shift(-1) - 2 * df_dupire_price[matu] + df_dupire_price[matu].shift(1)) / (pow(step, 2))
-    gamma = [np.NaN if g <= 0 else g for g in gamma]
-    theta = (df_dupire_price[round(matu+step,2)] - df_dupire_price[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
-    df_dupire[matu] = np.sqrt(2 * theta / (np.power(df_dupire["Strike"], 2) * gamma))
+df_dupire["k"] = df_dupire_tot_var["k"]
+for matu in df_dupire_tot_var.columns[1:]:
+    k = df_dupire["k"]
+    w = df_dupire_tot_var[matu]
+    dk = (df_dupire_tot_var[matu].shift(1) - df_dupire_tot_var[matu]) / step
+    dk2 = (df_dupire_tot_var[matu].shift(-1) - 2 * df_dupire_tot_var[matu] + df_dupire_tot_var[matu].shift(1)) / (pow(step, 2))
+    dT = (df_dupire_tot_var[round(matu+step,2)] - df_dupire_tot_var[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
+    df_dupire[matu] = np.sqrt(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2)))
 print(df_dupire)
 
 # Price Using Dupire Surface (Local Vol)
