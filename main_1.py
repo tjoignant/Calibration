@@ -3,14 +3,10 @@ import pandas as pd
 
 from matplotlib import cm
 from matplotlib import pyplot as plt
-from scipy.interpolate import interp1d
 
 import svi
-import utils
-import optimization
+import interpolation
 import black_scholes
-
-# Report Link : https://www.overleaf.com/project/639051dcb072f741700fb0f1
 
 # Set Pandas Display Settings
 pd.set_option('display.max_rows', 100)
@@ -36,14 +32,17 @@ for maturity in [3, 6, 9, 12]:
 
 # ---------------------------------------- PART 1.1 : RISK NEUTRAL DENSITY ----------------------------------------
 # Calibrate Interpolation Functions
-interp_function = interp1d(x=df_mkt["Strike"], y=df_mkt["IV (12M)"], kind='cubic')
-my_interp_function = utils.Interp(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
+linear_interp = interpolation.Interp1D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
+squared_interp = interpolation.Interp2D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
+cubic_interp = interpolation.Interp3D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (12M)"])
 
 # Create Interpolated Risk Neutral Density Dataframe (12M)
 df_density = pd.DataFrame()
-df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]), step)
-df_density["IV"] = df_density.apply(lambda x: interp_function(x["Strike"]), axis=1)
-df_density["IV (2D)"] = df_density.apply(lambda x: my_interp_function.get_image(x["Strike"]), axis=1)
+df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
+df_density["IV (1D)"] = df_density.apply(lambda x: linear_interp.get_image(x["Strike"]), axis=1)
+df_density["IV (2D)"] = df_density.apply(lambda x: squared_interp.get_image(x["Strike"]), axis=1)
+df_density["IV (3D)"] = df_density.apply(lambda x: cubic_interp.get_image(x["Strike"]), axis=1)
+df_density["IV"] = df_density["IV (2D)"]
 df_density["Price"] = df_density.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
 
@@ -54,8 +53,9 @@ df_density["Density Norm"] = df_density["Density"] / df_density["Density"].sum()
 
 # Plot & Save Graph: Interpolated Volatilities
 fig1, axs1 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs1.plot(df_density["Strike"], df_density["IV (2D)"], label="Interpolated (2D)")
-axs1.plot(df_density["Strike"], df_density["IV"], label="Interpolated (3D)")
+axs1.plot(df_density["Strike"], df_density["IV (1D)"], label="Linear")
+axs1.plot(df_density["Strike"], df_density["IV (2D)"], label="Squared")
+axs1.plot(df_density["Strike"], df_density["IV (3D)"], label="Cubic")
 axs1.scatter(df_mkt["Strike"], df_mkt["IV (12M)"], label="Implied")
 axs1.grid()
 axs1.set_xlabel("Strike")
@@ -97,7 +97,7 @@ fig3.savefig('results/1.3_SVI_Calibration.png')
 
 # Set Custom Density Dataframe
 df_custom_density = pd.DataFrame()
-df_custom_density["Strike"] = np.arange(95, 105, step)
+df_custom_density["Strike"] = np.arange(95, 105+step, step)
 df_custom_density["IV"] = df_custom_density.apply(
     lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
                               rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
@@ -168,8 +168,8 @@ def target_distrib(x, pi_x, pi_y):
     return output
 
 
-# Algorithm
-N = 100000
+# Metropolis-Hastings Algorithm
+N = 250000
 rdm_x = np.arange(N, dtype=float)
 rdm_x[0] = 100
 counter = 0
@@ -187,7 +187,7 @@ print(f"\nMetropolis-Hastings Acceptance Ratio: {counter / float(N)}")
 
 # Compute SVI & Density Prices
 df_metropolis = pd.DataFrame()
-df_metropolis["Strike"] = np.arange(95, 105, 1)
+df_metropolis["Strike"] = range(95, 105)
 df_metropolis["IV"] = df_metropolis.apply(
     lambda x: np.sqrt(svi.SVI(k=np.log(x["Strike"] / 100), a_=SVI_params["a_"], b_=SVI_params["b_"],
                               rho_=SVI_params["rho_"], m_=SVI_params["m_"], sigma_=SVI_params["sigma_"])), axis=1)
@@ -212,118 +212,6 @@ axs5.legend()
 axs5.set_xlabel("Strike")
 axs5.set_ylabel("Density")
 fig5.savefig('results/1.5_Metropolis_Density.png')
-
-# ---------------------------------------- PART 2.1 : VOLATILITY INTERPOLATION ----------------------------------------
-# Plot & Save Graph: Volatility Surface
-fig6 = plt.figure(figsize=(15, 7.5))
-axs6 = fig6.add_subplot(1, 1, 1, projection='3d')
-X, Y = np.meshgrid(df_mkt["Strike"], [3, 6, 9, 12])
-Z = np.array([np.array(df_mkt["IV (3M)"]), np.array(df_mkt["IV (6M)"]),
-              np.array(df_mkt["IV (9M)"]), np.array(df_mkt["IV (12M)"])])
-surf = axs6.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-axs6.set_xlabel("Strike")
-axs6.set_ylabel("Maturity")
-axs6.set_zlabel("IV")
-fig6.savefig('results/2.1_Volatility_Surface.png')
-
-# Compute New Option BS Price (K=99.5, T=8M)
-df_local_vol = df_mkt
-df_local_vol["Maturity Interp"] = df_local_vol.apply(
-    lambda x: interp1d(x=[3, 6, 9, 12], y=[x[f"IV ({matu}M)"] for matu in [3, 6, 9, 12]], kind='cubic'), axis=1)
-df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: x["Maturity Interp"](8), axis=1)
-interp_function = interp1d(x=df_local_vol["Strike"], y=df_local_vol["IV (8M)"], kind='cubic')
-BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8/12, v=interp_function(99.5), df=1, OptType="C")
-print(f"\nBlack-Scholes")
-print(f" - Implied Vol: {interp_function(99.5)}")
-print(f" - Price: {BS_price}")
-
-# Create Interpolated Local volatilities Dataframe
-my_interp_function = utils.Interp(x_list=df_local_vol["Strike"], y_list=df_local_vol["IV (8M)"])
-df_local_vol_bis = pd.DataFrame()
-df_local_vol_bis["Strike"] = np.arange(min(df_local_vol["Strike"]), max(df_local_vol["Strike"]), step)
-df_local_vol_bis["IV (2D)"] = df_local_vol_bis.apply(lambda x: my_interp_function.get_image(x=x["Strike"]), axis=1)
-df_local_vol_bis["IV"] = df_local_vol_bis.apply(lambda x: interp_function(x["Strike"]), axis=1)
-
-# Plot & Save Graph: Interpolated Volatilities (8M)
-fig7, axs7 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
-axs7.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV (2D)"], label="Interpolated Strike (2D)")
-axs7.plot(df_local_vol_bis["Strike"], df_local_vol_bis["IV"], label="Interpolated Strike (3D)")
-axs7.scatter(df_local_vol["Strike"], df_local_vol["IV (8M)"], label="Interpolated Maturity (3D)")
-axs7.grid()
-axs7.set_xlabel("Strike")
-axs7.set_ylabel("IV")
-axs7.legend()
-fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
-
-# -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
-# CEV Calibration (fixed gamma=1)
-# CEV Calibration
-
-# ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
-# Create Gamma DataFrame
-df_gamma = pd.DataFrame()
-for matu in [3, 6, 9, 12]:
-    df_gamma[f"{matu}M"] = df_mkt[f"Price ({matu}M)"].shift(-1) - 2 * df_mkt[f"Price ({matu}M)"] + df_mkt[f"Price ({matu}M)"].shift(1)
-
-# Create Theta DataFrame
-df_theta = pd.DataFrame()
-for matu in [3, 6, 9]:
-    df_theta[f"{matu}M"] = (df_mkt[f"Price ({matu+3}M)"] - df_mkt[f"Price ({matu}M)"]) / (3/12)
-df_theta["12M"] = np.NaN
-
-# Create Dupire DataFrame
-df_dupire = pd.DataFrame()
-df_dupire["Strike"] = df_mkt["Strike"]
-for matu in [3, 6, 9]:
-    df_dupire[f"{matu}M"] = np.sqrt(2 * df_theta[f"{matu}M"] / (np.power(df_dupire["Strike"], 2) * df_gamma[f"{matu}M"]))
-df_dupire["12M"] = np.NaN
-
-print(df_mkt)
-print(df_gamma)
-print(df_theta)
-print(df_dupire)
-
-
-# ----------------------------------------- PART 3 : OPTIMISATION ALGORITHMS ------------------------------------------
-# Set Inputs List
-mktPrice_list = list(df_mkt["Price (3M)"]) + list(df_mkt["Price (6M)"]) + list(df_mkt["Price (9M)"]) \
-                + list(df_mkt["Price (12M)"])
-strike_list = list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"])
-maturity_list = [3 / 12 for _ in list(df_mkt["Price (3M)"])] + [6 / 12 for _ in list(df_mkt["Price (6M)"])] + \
-                [9 / 12 for _ in list(df_mkt["Price (9M)"])] + [12 / 12 for _ in list(df_mkt["Price (12M)"])]
-inputs_list = []
-for i in range(0, len(mktPrice_list)):
-    inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
-
-# Estimate CEV Params (Scipy)
-params, error, nit = optimization.CEV_calibration_scipy(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
-print("\nScipy")
-print(f" - [gamma, sigma0]: {params}")
-print(f" - MSE: {error}")
-print(f" - nb iterations: {nit}")
-
-# Estimate CEV Params (Nelder-Mead)
-params, error, nit = optimization.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
-print("\nNelder-Mead")
-print(f" - [gamma, sigma0]: {params}")
-print(f" - MSE: {error}")
-print(f" - nb iterations: {nit}")
-
-# Estimate CEV Params (PSO)
-# iterations
-iters = 71
-# number of particles
-particles = 5
-# dimension, in our case 2 (sigma and gamma)
-dimension = 2
-# lower and upper bound, to restrain the search area and computing warnings
-low_bound = 0.01
-upp_bound = 0.99
-params, error, nit = optimization.CEV_calibration_pso(iters, particles, dimension, low_bound, upp_bound, inputs_list=inputs_list, mktPrice_list=mktPrice_list)
-print("\nParticle Swarm Optimization")
-print(f" - [gamma, sigma0]: {params}")
-print(f" - MSE: {error}")
-print(f" - nb iterations: {nit}")
 
 # Display Graphs
 plt.show()

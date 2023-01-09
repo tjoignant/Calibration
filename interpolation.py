@@ -1,7 +1,20 @@
+import scipy
 import numpy as np
 
 
-class Interp:
+class Interp1D:
+    def __init__(self, x_list, y_list):
+        self.x_list = x_list
+        self.y_list = y_list
+        self.n = len(x_list)
+
+    def get_image(self, x):
+        for i in range(0, self.n-1):
+            if self.x_list[i] <= x <= self.x_list[i + 1]:
+                return self.y_list[i] + (self.y_list[i+1] - self.y_list[i]) / (self.x_list[i+1] - self.x_list[i]) * (x - self.x_list[i])
+
+
+class Interp2D:
     def __init__(self, x_list, y_list):
         self.x_list = x_list
         self.y_list = y_list
@@ -10,11 +23,9 @@ class Interp:
 
     def get_image(self, x):
         a, b, c = 0, 0, 0
-        for i in range(0, self.n - 1):
+        for i in range(0, self.n-1):
             if self.x_list[i] <= x <= self.x_list[i + 1]:
-                a, b, c = self.U[3 * i], self.U[3 * i + 1], self.U[3 * i + 2]
-                break
-        return a * pow(x, 2) + b * x + c
+                return self.U[3 * i] * pow(x, 2) + self.U[3 * i + 1] * x + self.U[3 * i + 2]
 
     def __compute_coefs(self):
         # Compute V
@@ -81,7 +92,11 @@ class Interp:
         return np.array(U)[0]
 
 
-if __name__ == '__main__':
-    my_interp = Interp(x_list=[-3, -2, -1, 0, 1, 2, 3], y_list=[10, 5, 2, 0, 2, 5, 10])
-    image = my_interp.get_image(x=2.5)
-    print(image)
+class Interp3D:
+    def __init__(self, x_list, y_list):
+        self.x_list = x_list
+        self.y_list = y_list
+        self.interp = scipy.interpolate.interp1d(x=self.x_list, y=self.y_list, kind='cubic')
+
+    def get_image(self, x):
+        return self.interp(x)

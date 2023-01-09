@@ -185,6 +185,7 @@ def BS_IV_Nelder_Mead_1D(f, k, t, MktPrice, df, OptType):
         nb_iter = nb_iter + 1
     return x_list[0], nb_iter
 
+
 def BS_IV_Nelder_Mead(f, k, t, MktPrice, df, OptType):
     nb_iter = 0
     d = 1
