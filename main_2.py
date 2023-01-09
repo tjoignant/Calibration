@@ -43,12 +43,14 @@ axs6.set_zlabel("IV")
 fig6.savefig('results/2.1_Volatility_Surface.png')
 
 # Compute New Option BS Price (K=99.5, T=8M)
-strike_interp_6M = interpolation.Interp2D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (6M)"])
-strike_interp_9M = interpolation.Interp2D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (9M)"])
-maturity_interp = interpolation.Interp1D(x_list=[6, 9], y_list=[strike_interp_6M.get_image(99.5), strike_interp_9M.get_image(99.5)])
-BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8 / 12, v=maturity_interp.get_image(8), df=1, OptType="C")
+strike_interp_6M = interpolation.Interp3D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (6M)"])
+strike_interp_9M = interpolation.Interp3D(x_list=df_mkt["Strike"], y_list=df_mkt["IV (9M)"])
+maturity_interp = interpolation.Interp1D(x_list=[6, 9], y_list=[pow(strike_interp_6M.get_image(99.5), 2)*6/12,
+                                                                pow(strike_interp_9M.get_image(99.5), 2)*9/12])
+iv = np.sqrt(maturity_interp.get_image(8)/(8/12))
+BS_price = black_scholes.BS_Price(f=100, k=99.5, t=8 / 12, v=iv, df=1, OptType="C")
 print(f"\nBlack-Scholes")
-print(f" - Implied Vol: {maturity_interp.get_image(8)}")
+print(f" - Implied Vol: {iv}")
 print(f" - Price: {BS_price}")
 
 # Create Interpolated Local volatilities Dataframe
@@ -56,7 +58,8 @@ df_local_vol = pd.DataFrame()
 df_local_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"]+step), step)
 df_local_vol["IV (6M)"] = df_local_vol.apply(lambda x: strike_interp_6M.get_image(x=x["Strike"]), axis=1)
 df_local_vol["IV (9M)"] = df_local_vol.apply(lambda x: strike_interp_9M.get_image(x=x["Strike"]), axis=1)
-df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: interpolation.Interp1D(x_list=[6, 9], y_list=[strike_interp_6M.get_image(x["Strike"]), strike_interp_9M.get_image(x["Strike"])]).get_image(8), axis=1)
+df_local_vol["IV (8M)"] = df_local_vol.apply(lambda x: np.sqrt(interpolation.Interp1D(x_list=[6, 9],
+                                                                              y_list=[pow(strike_interp_6M.get_image(x["Strike"]), 2) * 6/12, pow(strike_interp_9M.get_image(x["Strike"]), 2) * 9/12]).get_image(8) / (8/12)), axis=1)
 
 # Plot & Save Graph: Interpolated Volatilities (8M)
 fig7, axs7 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
@@ -79,28 +82,31 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 # Create Interpolated Volatility Surface
 df_dupire_vol = pd.DataFrame()
 df_dupire_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
+
 # Squared Interpolation On Strikes
 for matu in [3, 6, 9, 12]:
-    strike_interp = interpolation.Interp2D(x_list=df_mkt["Strike"], y_list=df_mkt[f"IV ({matu}M)"])
+    strike_interp = interpolation.Interp3D(x_list=df_mkt["Strike"], y_list=df_mkt[f"IV ({matu}M)"])
     df_dupire_vol[f"{matu}"] = df_dupire_vol.apply(lambda x: strike_interp.get_image(x["Strike"]), axis=1)
-# Linear Interpolation On Maturities
+
+# Linear Interpolation On Total Variance
 for strike in df_dupire_vol["Strike"]:
     maturity_interp = interpolation.Interp1D(x_list=[3, 6, 9, 12],
-                                     y_list=[df_dupire_vol[df_dupire_vol["Strike"] == strike]["3"].values[0],
-                                             df_dupire_vol[df_dupire_vol["Strike"] == strike]["6"].values[0],
-                                             df_dupire_vol[df_dupire_vol["Strike"] == strike]["9"].values[0],
-                                             df_dupire_vol[df_dupire_vol["Strike"] == strike]["12"].values[0]])
+                                     y_list=[pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["3"].values[0], 2) * 3/12,
+                                             pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["6"].values[0], 2) * 6/12,
+                                             pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["9"].values[0], 2) * 9/12,
+                                             pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["12"].values[0], 2) * 12/12])
     for matu in np.arange(3, 12+step, step):
         index = df_dupire_vol[df_dupire_vol["Strike"] == strike].index[0]
-        df_dupire_vol.loc[index, round(matu, 2)] = maturity_interp.get_image(round(matu, 2))
+        df_dupire_vol.loc[index, round(matu, 2)] = np.sqrt(maturity_interp.get_image(round(matu, 2)) / (matu / 12))
 df_dupire_vol.drop(["3", "6", "9", "12"], axis=1, inplace=True)
+
 # Create Interpolated Price Surface
 df_dupire_price = pd.DataFrame()
 df_dupire_price["Strike"] = df_dupire_vol["Strike"]
 for matu in df_dupire_vol.columns[1:]:
     df_dupire_price[matu] = df_dupire_vol.apply(lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=matu / 12, v=x[matu], OptType="C"), axis=1)
 
-# Create Dupire DataFrame
+# Create Dupire Surface
 df_dupire = pd.DataFrame()
 df_dupire["Strike"] = df_dupire_price["Strike"]
 for matu in df_dupire_price.columns[1:]:
@@ -109,6 +115,9 @@ for matu in df_dupire_price.columns[1:]:
     theta = (df_dupire_price[round(matu+step,2)] - df_dupire_price[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
     df_dupire[matu] = np.sqrt(2 * theta / (np.power(df_dupire["Strike"], 2) * gamma))
 print(df_dupire)
+
+# Price Using Dupire Surface (Local Vol)
+
 
 # Display Graphs
 plt.show()

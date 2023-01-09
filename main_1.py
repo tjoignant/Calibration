@@ -42,7 +42,7 @@ df_density["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+st
 df_density["IV (1D)"] = df_density.apply(lambda x: linear_interp.get_image(x["Strike"]), axis=1)
 df_density["IV (2D)"] = df_density.apply(lambda x: squared_interp.get_image(x["Strike"]), axis=1)
 df_density["IV (3D)"] = df_density.apply(lambda x: cubic_interp.get_image(x["Strike"]), axis=1)
-df_density["IV"] = df_density["IV (2D)"]
+df_density["IV"] = df_density["IV (3D)"]
 df_density["Price"] = df_density.apply(
     lambda x: black_scholes.BS_Price(df=1, f=100, k=x["Strike"], t=1, v=x["IV"], OptType="C"), axis=1)
 
