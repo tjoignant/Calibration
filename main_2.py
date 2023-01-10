@@ -111,7 +111,7 @@ for matu in df_dupire_vol.columns[1:]:
 
 # Create Dupire Surface
 df_dupire = pd.DataFrame()
-df_dupire["k"] = df_dupire_tot_var["k"][1:-1]
+df_dupire["k"] = df_dupire_tot_var["k"]
 k = df_dupire["k"]
 for matu in df_dupire_tot_var.columns[1:-1]:
     w = df_dupire_tot_var[matu]
@@ -119,9 +119,40 @@ for matu in df_dupire_tot_var.columns[1:-1]:
     dk2 = 2 / (k.diff(1) - k.diff(-1)) * ((-df_dupire_tot_var[matu].diff(1)) / (k.diff(1)) - (df_dupire_tot_var[matu].diff(-1)) / (-k.diff(-1)))
     dT = (df_dupire_tot_var[round(matu+step, 2)] - df_dupire_tot_var[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
     df_dupire[matu] = np.sqrt(np.abs(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2))))
-print(df_dupire)
+df_dupire = df_dupire.iloc[1:-1]
+
+# Set Sigma Function
+def LV_sigma(LV_surface, St, t, F=100):
+    k = np.log(St / F)
+    t = round(t*12, 2)
+    # If St below k_min
+    if k <= min(LV_surface["k"]):
+        return LV_surface[t].values[0]
+    # If St above k_max
+    elif k >= max(LV_surface["k"]):
+        return LV_surface[t].values[-1]
+    # Else
+    else:
+        return interpolation.Interp1D(x_list=LV_surface["k"].values, y_list=LV_surface[t].values).get_image(k)
+
+
+# Set Local Vol Monte Carlo Diffusion
+def LV_Diffusion(S0, drift, maturity, LV_surface, nb_simuls, nb_steps, seed=123):
+    np.random.seed(seed)
+    dt = maturity / nb_steps
+    S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
+    Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
+    for i in range(1, nb_steps + 1):
+        sigma = np.array([LV_sigma(LV_surface=LV_surface, St=s, t=maturity-(i-1)*dt) for s in S[i - 1]])
+        S[i] = S[i - 1] * np.exp((drift - 0.5 * sigma) * dt + np.sqrt(sigma * dt) * Z[i-1, :])
+    return S
+
 
 # Price Using Dupire Surface (Local Vol)
+simulations = LV_Diffusion(S0=100, drift=0, maturity=8/12, LV_surface=df_dupire, nb_simuls=10000, nb_steps=80)
+price = np.mean(np.array([max(0, (sim - 99.5)) for sim in simulations[-1]]))
+print("\nDupire")
+print(f" - Price: {price}")
 
 
 # Display Graphs
