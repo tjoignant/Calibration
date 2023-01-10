@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -29,7 +30,7 @@ for maturity in [3, 6, 9, 12]:
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
-# ---------------------------------------- PART 2.1 : VOLATILITY INTERPOLATION ----------------------------------------
+# ---------------------------------------- PART 2.1 : BLACK-SCHOLES PRICE ----------------------------------------
 # Plot & Save Graph: Volatility Surface
 fig6 = plt.figure(figsize=(15, 7.5))
 axs6 = fig6.add_subplot(1, 1, 1, projection='3d')
@@ -73,12 +74,12 @@ axs7.legend()
 fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
 
-# -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
+# -------------------------------------------- PART 2.2 : CEV PRICE ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
 
 
-# ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
+# ------------------------------------------- PART 2.3 : DUPIRE PRICE-------------------------------------------
 # Create Interpolated Volatility Surface
 df_dupire_vol = pd.DataFrame()
 df_dupire_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
@@ -90,12 +91,13 @@ for matu in [3, 6, 9, 12]:
 
 # Linear Interpolation On Total Variance
 for strike in df_dupire_vol["Strike"]:
-    maturity_interp = interpolation.Interp1D(x_list=[3, 6, 9, 12],
-                                     y_list=[pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["3"].values[0], 2) * 3/12,
+    maturity_interp = interpolation.Interp1D(x_list=[0, 3, 6, 9, 12],
+                                     y_list=[0,
+                                             pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["3"].values[0], 2) * 3/12,
                                              pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["6"].values[0], 2) * 6/12,
                                              pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["9"].values[0], 2) * 9/12,
                                              pow(df_dupire_vol[df_dupire_vol["Strike"] == strike]["12"].values[0], 2) * 12/12])
-    for matu in np.arange(3, 12+step, step):
+    for matu in np.arange(step, 12+step, step):
         index = df_dupire_vol[df_dupire_vol["Strike"] == strike].index[0]
         df_dupire_vol.loc[index, round(matu, 2)] = np.sqrt(maturity_interp.get_image(round(matu, 2)) / (matu / 12))
 df_dupire_vol.drop(["3", "6", "9", "12"], axis=1, inplace=True)
@@ -103,19 +105,20 @@ df_dupire_vol.drop(["3", "6", "9", "12"], axis=1, inplace=True)
 # Create Tot Variance Surfacce
 df_dupire_tot_var = pd.DataFrame()
 df_dupire_tot_var["k"] = np.log(df_dupire_vol["Strike"] / 100)
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 for matu in df_dupire_vol.columns[1:]:
-    df_dupire_tot_var[matu] = df_dupire_vol.apply(lambda x: pow(x[matu], 2) * matu/12, axis=1)
+    df_dupire_tot_var[matu] = np.power(df_dupire_vol[matu], 2) * matu/12
 
 # Create Dupire Surface
 df_dupire = pd.DataFrame()
-df_dupire["k"] = df_dupire_tot_var["k"]
-for matu in df_dupire_tot_var.columns[1:]:
-    k = df_dupire["k"]
+df_dupire["k"] = df_dupire_tot_var["k"][1:-1]
+k = df_dupire["k"]
+for matu in df_dupire_tot_var.columns[1:-1]:
     w = df_dupire_tot_var[matu]
-    dk = (df_dupire_tot_var[matu].shift(1) - df_dupire_tot_var[matu]) / step
-    dk2 = (df_dupire_tot_var[matu].shift(-1) - 2 * df_dupire_tot_var[matu] + df_dupire_tot_var[matu].shift(1)) / (pow(step, 2))
-    dT = (df_dupire_tot_var[round(matu+step,2)] - df_dupire_tot_var[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
-    df_dupire[matu] = np.sqrt(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2)))
+    dk = (df_dupire_tot_var[matu].diff(1)) / k.diff(1)
+    dk2 = 2 / (k.diff(1) - k.diff(-1)) * ((-df_dupire_tot_var[matu].diff(1)) / (k.diff(1)) - (df_dupire_tot_var[matu].diff(-1)) / (-k.diff(-1)))
+    dT = (df_dupire_tot_var[round(matu+step, 2)] - df_dupire_tot_var[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
+    df_dupire[matu] = np.sqrt(np.abs(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2))))
 print(df_dupire)
 
 # Price Using Dupire Surface (Local Vol)
