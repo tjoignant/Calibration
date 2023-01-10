@@ -111,9 +111,9 @@ for matu in df_dupire_vol.columns[1:]:
 
 # Create Dupire Surface
 df_dupire = pd.DataFrame()
-df_dupire["k"] = df_dupire_tot_var["k"]
+df_dupire["k"] = df_dupire_tot_var["k"][1:-1]
 k = df_dupire["k"]
-for matu in df_dupire_tot_var.columns[1:]:
+for matu in df_dupire_tot_var.columns[1:-1]:
     w = df_dupire_tot_var[matu]
     dk = (df_dupire_tot_var[matu].diff(1)) / k.diff(1)
     dk2 = 2 / (k.diff(1) - k.diff(-1)) * ((-df_dupire_tot_var[matu].diff(1)) / (k.diff(1)) - (df_dupire_tot_var[matu].diff(-1)) / (-k.diff(-1)))
