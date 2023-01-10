@@ -140,11 +140,11 @@ def LV_sigma(LV_surface, St, t, F=100):
 def LV_Diffusion(S0, drift, maturity, LV_surface, nb_simuls, nb_steps, seed=123):
     np.random.seed(seed)
     dt = maturity / nb_steps
-    S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0)
+    S = np.full(shape=(nb_steps + 1, nb_simuls), fill_value=S0, dtype=float)
     Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
     for i in range(1, nb_steps + 1):
         sigma = np.array([LV_sigma(LV_surface=LV_surface, St=s, t=maturity-(i-1)*dt) for s in S[i - 1]])
-        S[i] = S[i - 1] * np.exp((drift - 0.5 * sigma) * dt + np.sqrt(sigma * dt) * Z[i-1, :])
+        S[i] = S[i - 1] * np.exp((drift - 0.5 * np.power(sigma, 2)) * dt + sigma * np.sqrt(dt) * Z[i-1, :])
     return S
 
 
