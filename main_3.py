@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import time
 
 from matplotlib import cm
 from matplotlib import pyplot as plt
@@ -45,25 +46,35 @@ iters = 30
 particles = 10
 
 # Estimate CEV Params (Scipy)
+start = time.perf_counter()
 params, error, nit = cev.CEV_calibration_scipy(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+end = time.perf_counter()
 print("\nScipy (Nelder-Mead)")
 print(f" - [gamma, sigma0]: {params}")
 print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
+print(f" - optimum reached ({round(end - start, 1)}s)")
+
 
 # Estimate CEV Params (Nelder-Mead)
+start = time.perf_counter()
 params, error, nit = cev.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+end = time.perf_counter()
 print("\nNelder-Mead")
 print(f" - [gamma, sigma0]: {params}")
 print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
+print(f" - optimum reached ({round(end - start, 1)}s)")
 
 # Estimate CEV Params (PSO)
+start = time.perf_counter()
 params, error, nit = cev.CEV_calibration_pso(max_iter=iters, n=particles, dim=2, lowx=0.01, uppx=0.99, inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+end = time.perf_counter()
 print("\nParticle Swarm Optimization")
 print(f" - [gamma, sigma0]: {params}")
 print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
+print(f" - optimum reached ({round(end - start, 1)}s)")
 
 # Display Graphs
 plt.show()

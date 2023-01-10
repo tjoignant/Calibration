@@ -4,7 +4,7 @@ import numpy as np
 import scipy.optimize as optimize
 
 MAX_ITER = 500
-MAX_ERROR = pow(10, -2)
+MAX_ERROR = pow(10, -3)
 
 def CEV_monte_carlo(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=1000, seed=1):
     """
@@ -258,9 +258,11 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
             best_swarm_fitnessVal = swarm[i].score
             best_swarm_pos = copy.copy(swarm[i].position)
 
+    previous_best_swarm_fitnessVal = 10000
+
     # main loop of pso
     iteration = 0
-    while iteration < max_iter:
+    while previous_best_swarm_fitnessVal - best_swarm_fitnessVal > MAX_ERROR and iteration < MAX_ITER:
 
         # after every 10 iterations
         # print iteration number and best fitness value so far
@@ -269,6 +271,7 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
             print("Iter = " + str(iteration) + " best fitness = %.3f" % best_swarm_fitnessVal)
             print(best_swarm_fitnessVal)
         """
+
         for i in range(n):  # process each particle
 
             # compute new velocity of curr particle
@@ -298,6 +301,7 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
 
             # is new position a new best overall?
             if swarm[i].score < best_swarm_fitnessVal:
+                previous_best_swarm_fitnessVal = copy.copy(best_swarm_fitnessVal)
                 best_swarm_fitnessVal = swarm[i].score
                 best_swarm_pos = copy.copy(swarm[i].position)
 
