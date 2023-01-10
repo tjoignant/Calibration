@@ -144,7 +144,10 @@ def LV_Diffusion(S0, drift, maturity, LV_surface, nb_simuls, nb_steps, seed=123)
     Z = np.random.normal(loc=0, scale=1, size=(nb_steps, nb_simuls))
     for i in range(1, nb_steps + 1):
         sigma = np.array([LV_sigma(LV_surface=LV_surface, St=s, t=maturity-(i-1)*dt) for s in S[i - 1]])
+        # EULER
         S[i] = S[i - 1] * np.exp((drift - 0.5 * np.power(sigma, 2)) * dt + sigma * np.sqrt(dt) * Z[i-1, :])
+        # APPROX
+        # S[i] = S[i - 1] * (1 + drift * dt + sigma * np.sqrt(dt) * Z[i - 1, :])
     return S
 
 
