@@ -30,7 +30,7 @@ for maturity in [3, 6, 9, 12]:
         lambda x: black_scholes.BS_IV_Newton_Raphson(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, OptType="C")[0], axis=1)
 
-# ---------------------------------------- PART 2.1 : VOLATILITY INTERPOLATION ----------------------------------------
+# ---------------------------------------- PART 2.1 : BLACK-SCHOLES PRICE ----------------------------------------
 # Plot & Save Graph: Volatility Surface
 fig6 = plt.figure(figsize=(15, 7.5))
 axs6 = fig6.add_subplot(1, 1, 1, projection='3d')
@@ -74,12 +74,12 @@ axs7.legend()
 fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
 
-# -------------------------------------------- PART 2.2 : CEV CALIBRATION ---------------------------------------------
+# -------------------------------------------- PART 2.2 : CEV PRICE ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
 # CEV Calibration
 
 
-# ------------------------------------------- PART 2.3 : DUPIRE CALIBRATION -------------------------------------------
+# ------------------------------------------- PART 2.3 : DUPIRE PRICE-------------------------------------------
 # Create Interpolated Volatility Surface
 df_dupire_vol = pd.DataFrame()
 df_dupire_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
