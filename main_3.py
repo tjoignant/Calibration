@@ -41,10 +41,6 @@ inputs_list = []
 for i in range(0, len(mktPrice_list)):
     inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
 
-# Set PSO Inputs
-iters = 30
-particles = 10
-
 # Estimate CEV Params (Scipy)
 start = time.perf_counter()
 params, error, nit = cev.CEV_calibration_scipy(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
@@ -66,15 +62,33 @@ print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
 print(f" - optimum reached ({round(end - start, 1)}s)")
 
+# Set PSO Inputs
+particles = [2, 3, 4, 5, 6, 7, 8, 9, 10, 15]
+iteration_list = []
 # Estimate CEV Params (PSO)
-start = time.perf_counter()
-params, error, nit = cev.CEV_calibration_pso(max_iter=iters, n=particles, dim=2, lowx=0.01, uppx=0.99, inputs_list=inputs_list, mktPrice_list=mktPrice_list)
-end = time.perf_counter()
-print("\nParticle Swarm Optimization")
-print(f" - [gamma, sigma0]: {params}")
-print(f" - MSE: {error}")
-print(f" - nb iterations: {nit}")
-print(f" - optimum reached ({round(end - start, 1)}s)")
+for nb_particle in particles:
+    start = time.perf_counter()
+    params, error, nit, hist_error = cev.CEV_calibration_pso(n=nb_particle, dim=2, lowx=0.01, uppx=0.99,
+                                                             inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+    end = time.perf_counter()
+    print("\nParticle Swarm Optimization")
+    print(f" - [gamma, sigma0]: {params}")
+    print(f" - MSE: {error}")
+    print(f" - nb iterations: {nit}")
+    print(f" - optimum reached ({round(end - start, 1)}s)")
+    print(f" - nb particles: {nb_particle}")
+    iteration_list.append(nit)
+
+
+# Plot & Save Graph: Iterations required PSO
+x = np.arange(len(iteration_list))
+fig8, axs8 = plt.subplots(nrows=1, ncols=1, figsize=(15, 7.5))
+axs8.bar(x, height=iteration_list)
+axs8.set_xticks(x, labels=map(str, particles))
+axs8.grid()
+axs8.set_xlabel("Iteration")
+axs8.set_ylabel("Particles")
+fig8.savefig('results/3_PSO_iterations.png')
 
 # Display Graphs
 plt.show()

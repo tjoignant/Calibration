@@ -4,7 +4,7 @@ import numpy as np
 import scipy.optimize as optimize
 
 MAX_ITER = 500
-MAX_ERROR = pow(10, -3)
+MAX_ERROR = pow(10, -2)
 
 def CEV_monte_carlo(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=1000, seed=1):
     """
@@ -223,7 +223,7 @@ class Particle:
 
 
 # particle swarm optimization function
-def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPrice_list: list):
+def CEV_calibration_pso(n, dim, lowx, uppx, inputs_list: list, mktPrice_list: list):
     """
     :param n: number of Particles in a swarm
     :param dim: dimension, i.e. in our case 2 since we have sigma and gamma
@@ -259,6 +259,8 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
             best_swarm_pos = copy.copy(swarm[i].position)
 
     previous_best_swarm_fitnessVal = 10000
+    list_best_swarm_fitness = []
+    list_best_swarm_fitness.append(copy.copy(best_swarm_fitnessVal))
 
     # main loop of pso
     iteration = 0
@@ -266,11 +268,9 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
 
         # after every 10 iterations
         # print iteration number and best fitness value so far
-        """
-        if iteration % 10 == 0 and iteration > 1:
+
+        if iteration > 1:
             print("Iter = " + str(iteration) + " best fitness = %.3f" % best_swarm_fitnessVal)
-            print(best_swarm_fitnessVal)
-        """
 
         for i in range(n):  # process each particle
 
@@ -307,7 +307,8 @@ def CEV_calibration_pso(max_iter, n, dim, lowx, uppx, inputs_list: list, mktPric
 
         # for-each particle
         iteration += 1
+        list_best_swarm_fitness.append(copy.copy(best_swarm_fitnessVal))
     # end_while
-    return best_swarm_pos, best_swarm_fitnessVal, iteration
+    return best_swarm_pos, best_swarm_fitnessVal, iteration, list_best_swarm_fitness
 # end pso
 
