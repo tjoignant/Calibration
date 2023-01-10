@@ -115,10 +115,10 @@ df_dupire["k"] = df_dupire_tot_var["k"]
 k = df_dupire["k"]
 for matu in df_dupire_tot_var.columns[1:]:
     w = df_dupire_tot_var[matu]
-    dk = (df_dupire_tot_var[matu].shift(1) - df_dupire_tot_var[matu]) / k.diff(1)
-    dk2 = 2 / (k.diff(1) - k.diff(-1)) * ((df_dupire_tot_var[matu].shift(1) - df_dupire_tot_var[matu]) / (k.diff(1)) - (df_dupire_tot_var[matu] - df_dupire_tot_var[matu].shift(-1)) / (-k.diff(-1)))
+    dk = (df_dupire_tot_var[matu].diff(1)) / k.diff(1)
+    dk2 = 2 / (k.diff(1) - k.diff(-1)) * ((-df_dupire_tot_var[matu].diff(1)) / (k.diff(1)) - (df_dupire_tot_var[matu].diff(-1)) / (-k.diff(-1)))
     dT = (df_dupire_tot_var[round(matu+step, 2)] - df_dupire_tot_var[matu]) / (step / 12) if round(matu, 2) != 12.0 else np.NaN
-    df_dupire[matu] = np.sqrt(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2)))
+    df_dupire[matu] = np.sqrt(np.abs(dT / (1 - k/w * dk + 1/2 * dk2 + 1/4 * (np.power(k, 2) / np.power(w, 2) - 1/w - 1/4) * np.power(dk, 2))))
 print(df_dupire)
 
 # Price Using Dupire Surface (Local Vol)
