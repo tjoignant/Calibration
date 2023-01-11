@@ -157,6 +157,5 @@ price = np.mean(np.array([max(0, (sim - 99.5)) for sim in simulations[-1]]))
 print("\nDupire")
 print(f" - Price: {price}")
 
-
 # Display Graphs
 plt.show()
