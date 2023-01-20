@@ -54,31 +54,32 @@ print(f" - optimum reached ({round(end - start, 1)}s)")
 
 # Estimate CEV Params (Nelder-Mead)
 start = time.perf_counter()
-params, error, nit = cev.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
+params_nm, error_nm, nit_nm, hist_error_nm = cev.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
 end = time.perf_counter()
 print("\nNelder-Mead")
-print(f" - [gamma, sigma0]: {params}")
-print(f" - MSE: {error}")
-print(f" - nb iterations: {nit}")
+print(f" - [gamma, sigma0]: {params_nm}")
+print(f" - MSE: {error_nm}")
+print(f" - nb iterations: {nit_nm}")
 print(f" - optimum reached ({round(end - start, 1)}s)")
 
 # Set PSO Inputs
 particles = [2, 3, 4, 5, 6, 7, 8, 9, 10, 15]
 iteration_list = []
+error_list = []
 # Estimate CEV Params (PSO)
 for nb_particle in particles:
     start = time.perf_counter()
-    params, error, nit, hist_error = cev.CEV_calibration_pso(n=nb_particle, dim=2, lowx=0.01, uppx=0.99,
+    params_pso, error_pso, nit_pso, hist_error_pso = cev.CEV_calibration_pso(n=nb_particle, dim=2, lowx=0.01, uppx=0.99,
                                                              inputs_list=inputs_list, mktPrice_list=mktPrice_list)
     end = time.perf_counter()
     print("\nParticle Swarm Optimization")
-    print(f" - [gamma, sigma0]: {params}")
-    print(f" - MSE: {error}")
-    print(f" - nb iterations: {nit}")
+    print(f" - [gamma, sigma0]: {params_pso}")
+    print(f" - MSE: {error_pso}")
+    print(f" - nb iterations: {nit_pso}")
     print(f" - optimum reached ({round(end - start, 1)}s)")
     print(f" - nb particles: {nb_particle}")
-    iteration_list.append(nit)
-
+    iteration_list.append(nit_pso)
+    error_list.append(hist_error_pso)
 
 # Plot & Save Graph: Iterations required PSO
 x = np.arange(len(iteration_list))
@@ -89,6 +90,21 @@ axs8.grid()
 axs8.set_xlabel("Iteration")
 axs8.set_ylabel("Particles")
 fig8.savefig('results/3_PSO_iterations.png')
+
+# We choose the PSO model with 6 particles because we can see on the above graph that it has good performances
+fig9, ax9 = plt.subplots(figsize=(15, 7.5))
+ax9.title.set_text('Error Evolution')
+ax9.plot(np.linspace(0, iteration_list[4], iteration_list[4]+1), hist_error_nm[:iteration_list[4]+1], color="blue", linewidth=2, label="Nelder Mead")
+ax9.set_xlabel("Iteration")
+ax9.set_ylabel("Nelder Mead Error", color="blue")
+ax9.tick_params(axis='y', labelcolor="blue")
+ax9bis = ax9.twinx()  # instantiate a second axes that shares the same x-axis
+ax9bis.set_ylabel('PSO Error', color="red")  # we already handled the x-label with ax1
+ax9bis.plot(np.linspace(0, iteration_list[4], iteration_list[4]+1), error_list[4], color="red", linewidth=2, label="PSO")
+ax9bis.tick_params(axis='y', labelcolor="red")
+fig9.tight_layout()  # otherwise the right y-label is slightly clipped
+ax9.grid()
+fig9.savefig('results/3_error_iterations.png')
 
 # Display Graphs
 plt.show()

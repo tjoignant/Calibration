@@ -89,6 +89,9 @@ def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
                                                                   mktPrice_list=mktPrice_list)
     # Sorting Solver
     solver = {k: v for k, v in sorted(solver.items(), key=lambda item: item[1])}
+    list_best_score = []
+    list_best_score.append(copy.copy(list(solver.values())[0]))
+
     while list(solver.values())[1] - list(solver.values())[0] > MAX_ERROR and nb_iter < MAX_ITER:
         # Compute The Barycenter (excluding d+1 params vector)
         x0 = []
@@ -185,9 +188,10 @@ def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
                     solver.update(new_points)
         # Sorting Solver
         solver = {k: v for k, v in sorted(solver.items(), key=lambda item: item[1])}
+        list_best_score.append(copy.copy(list(solver.values())[0]))
         # Update Nb Iter
         nb_iter = nb_iter + 1
-    return list(solver.keys())[0], list(solver.values())[0], nb_iter
+    return list(solver.keys())[0], list(solver.values())[0], nb_iter, list_best_score
 
 
 # particle class
