@@ -3,7 +3,7 @@ import random
 import numpy as np
 import scipy.optimize as optimize
 
-MAX_ITER = 500
+MAX_ITERS = 500
 MAX_ERROR = pow(10, -2)
 
 def CEV_monte_carlo(S0: float, sigma0: float, gamma: float, drift: float, maturity: float, nb_simuls=1000, seed=1):
@@ -37,6 +37,53 @@ def CEV_Price(k, t, f, df, OptType, gamma, sigma0):
     }
     return switcher.get(OptType.upper(), 0)
 
+
+def CEV_Sigma_Nelder_Mead_1D(k, t, f, df, OptType, gamma, MktPrice):
+    nb_iter = 0
+    x_list = [0.2, 0.5]
+    fx_list = [abs(CEV_Price(k, t, f, df, OptType, gamma, x) - MktPrice) for x in x_list]
+    # Sorting
+    if fx_list[1] < fx_list[0]:
+        temp = x_list[0]
+        x_list[0] = x_list[1]
+        x_list[1] = temp
+    fx_list = [abs(CEV_Price(k, t, f, df, OptType, gamma, x) - MktPrice) for x in x_list]
+    while fx_list[0] > MAX_ERROR and nb_iter < MAX_ITERS:
+        # Reflexion
+        xr = x_list[0] + (x_list[0] - x_list[1])
+        fxr = abs(CEV_Price(k, t, f, df, OptType, gamma, xr) - MktPrice)
+        # Expansion
+        if fxr < fx_list[0]:
+            xe = x_list[0] + 2 * (x_list[0] - x_list[1])
+            fxe = abs(CEV_Price(k, t, f, df, OptType, gamma, xe) - MktPrice)
+            if fxe <= fxr:
+                x_list = [xe, x_list[0]]
+            else:
+                x_list = [xr, x_list[0]]
+        # Contraction
+        else:
+            x_list = [x_list[0], 0.5 * (x_list[0] + x_list[1])]
+        # Recompute Each Error
+        fx_list = [abs(CEV_Price(k, t, f, df, OptType, gamma, x) - MktPrice) for x in x_list]
+        # Sorting X List
+        if fx_list[1] < fx_list[0]:
+            temp = x_list[0]
+            x_list[0] = x_list[1]
+            x_list[1] = temp
+        fx_list = [abs(CEV_Price(k, t, f, df, OptType, gamma, x) - MktPrice) for x in x_list]
+        # Add Nb Iter
+        nb_iter = nb_iter + 1
+    return x_list[0], nb_iter
+
+
+def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_list: list, mktPrice_list: list):
+    """
+    :param params_list: [gamma_]
+    :param inputs_list: [(K_1, T_1, f_1, df_1, OptType_1), (K_2, T_2, f_2, df_2, OptType_2), ...]
+    :param mktPrice_list: [mktPrice_1, mktPrice_2, ...]
+    :return: calibration error
+    """
+    params_list: [gamma_, sigma0_]
 
 def CEV_minimisation_function(params_list: list, inputs_list: list, mktPrice_list: list):
     """
@@ -92,7 +139,7 @@ def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
     list_best_score = []
     list_best_score.append(copy.copy(list(solver.values())[0]))
 
-    while list(solver.values())[1] - list(solver.values())[0] > MAX_ERROR and nb_iter < MAX_ITER:
+    while list(solver.values())[1] - list(solver.values())[0] > MAX_ERROR and nb_iter < MAX_ITERS:
         # Compute The Barycenter (excluding d+1 params vector)
         x0 = []
         for i in range(0, d):
@@ -268,7 +315,7 @@ def CEV_calibration_pso(n, dim, lowx, uppx, inputs_list: list, mktPrice_list: li
 
     # main loop of pso
     iteration = 0
-    while previous_best_swarm_fitnessVal - best_swarm_fitnessVal > MAX_ERROR and iteration < MAX_ITER:
+    while previous_best_swarm_fitnessVal - best_swarm_fitnessVal > MAX_ERROR and iteration < MAX_ITERS:
 
         # after every 10 iterations
         # print iteration number and best fitness value so far

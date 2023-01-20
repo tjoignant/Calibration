@@ -5,6 +5,7 @@ import pandas as pd
 from matplotlib import cm
 from matplotlib import pyplot as plt
 
+import cev
 import interpolation
 import black_scholes
 
@@ -76,10 +77,33 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
 # -------------------------------------------- PART 2.2 : CEV PRICE ---------------------------------------------
 # CEV Calibration (fixed gamma=1)
+df_cev_fixed_gamma = df_mkt
+
+# Compute Option's Implied Volatility (IV)
+for maturity in [3, 6, 9, 12]:
+    df_cev_fixed_gamma[f"sigma0 ({maturity}M)"] = df_cev_fixed_gamma.apply(
+        lambda x: cev.CEV_Sigma_Nelder_Mead_1D(
+            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, gamma=1, OptType="C")[0], axis=1)
+
+# Plot & Save Graph: Volatility Surface
+fig8 = plt.figure(figsize=(15, 7.5))
+axs8 = fig8.add_subplot(1, 1, 1, projection='3d')
+X, Y = np.meshgrid(df_cev_fixed_gamma["Strike"], [3, 6, 9, 12])
+Z = np.array([np.array(df_cev_fixed_gamma["sigma0 (3M)"]), np.array(df_cev_fixed_gamma["sigma0 (6M)"]),
+              np.array(df_cev_fixed_gamma["sigma0 (9M)"]), np.array(df_cev_fixed_gamma["sigma0 (12M)"])])
+surf = axs8.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+axs8.set_xlabel("Strike")
+axs8.set_ylabel("Maturity")
+axs8.set_zlabel("Sigma0")
+fig8.savefig('results/2.3_Sigma0_Surface.png')
+
+
 # CEV Calibration
 
 
-# ------------------------------------------- PART 2.3 : DUPIRE PRICE-------------------------------------------
+# ------------------------------------------- PART 2.3 : DUPIRE PRICE -------------------------------------------
+
+"""
 # Create Interpolated Volatility Surface
 df_dupire_vol = pd.DataFrame()
 df_dupire_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
@@ -156,6 +180,7 @@ simulations = LV_Diffusion(S0=100, drift=0, maturity=8/12, LV_surface=df_dupire,
 price = np.mean(np.array([max(0, (sim - 99.5)) for sim in simulations[-1]]))
 print("\nDupire")
 print(f" - Price: {price}")
+"""
 
 # Display Graphs
 plt.show()
