@@ -77,7 +77,6 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
 
 # -------------------------------------------- PART 2.2 : CEV PRICE ---------------------------------------------
-"""
 # CEV Calibration (fixed gamma=1)
 df_cev_fixed_gamma = df_mkt
 
@@ -98,7 +97,6 @@ axs8.set_xlabel("Strike")
 axs8.set_ylabel("Maturity")
 axs8.set_zlabel("Sigma0")
 fig8.savefig('results/2.3_Sigma0_Surface.png')
-"""
 
 
 # CEV Calibration
@@ -153,7 +151,6 @@ print(f" - Price: {CEV_price}")
 
 # ------------------------------------------- PART 2.3 : DUPIRE PRICE -------------------------------------------
 
-"""
 # Create Interpolated Volatility Surface
 df_dupire_vol = pd.DataFrame()
 df_dupire_vol["Strike"] = np.arange(min(df_mkt["Strike"]), max(df_mkt["Strike"])+step, step)
@@ -230,7 +227,6 @@ simulations = LV_Diffusion(S0=100, drift=0, maturity=8/12, LV_surface=df_dupire,
 price = np.mean(np.array([max(0, (sim - 99.5)) for sim in simulations[-1]]))
 print("\nDupire")
 print(f" - Price: {price}")
-"""
 
 # Display Graphs
 plt.show()
