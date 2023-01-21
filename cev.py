@@ -111,16 +111,18 @@ def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_lis
 
 def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list):
     nb_iter = 0
-    x_list = [0.5, 1.5]
+    x_list = [0.8, 1.2]
     fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
     # Sorting
     if fx_list[1] < fx_list[0]:
-        temp = x_list[0]
+        temp_x = x_list[0]
         x_list[0] = x_list[1]
-        x_list[1] = temp
-    fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
-    while fx_list[1] - fx_list[0] > MAX_ERROR and nb_iter < MAX_ITERS:
-        print(x_list, fx_list)
+        x_list[1] = temp_x
+        temp_fx = fx_list[0]
+        fx_list[0] = fx_list[1]
+        fx_list[1] = temp_fx
+    while fx_list[1] - fx_list[0] > MAX_ERROR / 10000 and nb_iter < MAX_ITERS:
+        print(nb_iter, x_list, fx_list)
         # Reflexion
         xr = x_list[0] + (x_list[0] - x_list[1])
         fxr = CEV_sigma_regularisation_minimisation_function([xr], inputs_list, mktPrice_list)
@@ -137,12 +139,14 @@ def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list)
             x_list = [x_list[0], 0.5 * (x_list[0] + x_list[1])]
         # Recompute Each Error
         fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
-        # Sorting X List
+        # Sorting
         if fx_list[1] < fx_list[0]:
-            temp = x_list[0]
+            temp_x = x_list[0]
             x_list[0] = x_list[1]
-            x_list[1] = temp
-        fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
+            x_list[1] = temp_x
+            temp_fx = fx_list[0]
+            fx_list[0] = fx_list[1]
+            fx_list[1] = temp_fx
         # Add Nb Iter
         nb_iter = nb_iter + 1
     return x_list[0], nb_iter
