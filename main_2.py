@@ -76,6 +76,7 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 
 
 # -------------------------------------------- PART 2.2 : CEV PRICE ---------------------------------------------
+"""
 # CEV Calibration (fixed gamma=1)
 df_cev_fixed_gamma = df_mkt
 
@@ -85,7 +86,7 @@ for maturity in [3, 6, 9, 12]:
         lambda x: cev.CEV_Sigma_Nelder_Mead_1D(
             MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, gamma=1, OptType="C")[0], axis=1)
 
-# Plot & Save Graph: Volatility Surface
+# Plot & Save Graph: Sigma0 Surface
 fig8 = plt.figure(figsize=(15, 7.5))
 axs8 = fig8.add_subplot(1, 1, 1, projection='3d')
 X, Y = np.meshgrid(df_cev_fixed_gamma["Strike"], [3, 6, 9, 12])
@@ -96,9 +97,42 @@ axs8.set_xlabel("Strike")
 axs8.set_ylabel("Maturity")
 axs8.set_zlabel("Sigma0")
 fig8.savefig('results/2.3_Sigma0_Surface.png')
+"""
 
 
 # CEV Calibration
+df_cev_gamma = df_mkt
+mktPrice_list = list(df_mkt["Price (3M)"]) + list(df_mkt["Price (6M)"]) + list(df_mkt["Price (9M)"]) \
+                + list(df_mkt["Price (12M)"])
+strike_list = list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"]) + list(df_mkt["Strike"])
+maturity_list = [3 / 12 for _ in list(df_mkt["Price (3M)"])] + [6 / 12 for _ in list(df_mkt["Price (6M)"])] + \
+                [9 / 12 for _ in list(df_mkt["Price (9M)"])] + [12 / 12 for _ in list(df_mkt["Price (12M)"])]
+inputs_list = []
+for i in range(0, len(mktPrice_list)):
+    inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
+
+gamma, nb_iter = cev.CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list, mktPrice_list)
+print("\nCEV Calibration:")
+print(f" - gamma: {gamma}")
+print(f" - nb_iter: {nb_iter}")
+
+# Compute Option's Implied Volatility (IV)
+for maturity in [3, 6, 9, 12]:
+    df_cev_gamma[f"sigma0 ({maturity}M)"] = df_cev_gamma.apply(
+        lambda x: cev.CEV_Sigma_Nelder_Mead_1D(
+            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, gamma=1, OptType="C")[0], axis=1)
+
+# Plot & Save Graph: Sigma0 Surface (with calibrated gamma)
+fig9 = plt.figure(figsize=(15, 7.5))
+axs9 = fig8.add_subplot(1, 1, 1, projection='3d')
+X, Y = np.meshgrid(df_cev_fixed_gamma["Strike"], [3, 6, 9, 12])
+Z = np.array([np.array(df_cev_fixed_gamma["sigma0 (3M)"]), np.array(df_cev_fixed_gamma["sigma0 (6M)"]),
+              np.array(df_cev_fixed_gamma["sigma0 (9M)"]), np.array(df_cev_fixed_gamma["sigma0 (12M)"])])
+surf = axs9.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+axs9.set_xlabel("Strike")
+axs9.set_ylabel("Maturity")
+axs9.set_zlabel("Sigma0")
+fig9.savefig('results/2.4_Sigma0_Surface_Bis.png')
 
 
 # ------------------------------------------- PART 2.3 : DUPIRE PRICE -------------------------------------------

@@ -86,23 +86,65 @@ def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_lis
     # Compute Each Sigma0
     sigma0_list = []
     for i in range(0, len(mktPrice_list)):
-        sigma0_list.append(CEV_Sigma_Nelder_Mead_1D(inputs_list[i][0], inputs_list[i][1], inputs_list[i][2],
-                                                      inputs_list[i][3], inputs_list[i][4], params_list[0],
-                                                      mktPrice_list[i])[0])
+        sigma0_list.append(CEV_Sigma_Nelder_Mead_1D(k=inputs_list[i][0], t=inputs_list[i][1],f=inputs_list[i][2],
+                                                    df=inputs_list[i][3], OptType=inputs_list[i][4],
+                                                    gamma=params_list[0], MktPrice=mktPrice_list[i])[0])
     # Build Sigma0 Surface
     df_surface = pd.DataFrame(index=range(95, 105), columns=[3, 6, 9, 12])
     for i in range(0, len(mktPrice_list)):
         df_surface.loc[inputs_list[i][0], inputs_list[i][1]] = sigma0_list[i]
-    # Regularisation Error (RE)
+    # Compute Mean Regularisation Error (MRE)
     RE = 0
     for i in range(0, len(mktPrice_list)):
         # Absolute Diff over strikes
-        if inputs_list[i][0] is not 104:
+        if inputs_list[i][0] != 104:
             RE = RE + np.power(df_surface.loc[inputs_list[i][0], inputs_list[i][1]] -
                                df_surface.loc[inputs_list[i][0] + 1, inputs_list[i][1]], 2)
-        # Diff over strikes
-        if inputs_list[i][0] is not 104:
-    return RE
+        # Diff over maturities
+        if inputs_list[i][1] != 12:
+            RE = RE + np.power(df_surface.loc[inputs_list[i][0], inputs_list[i][1]] -
+                               df_surface.loc[inputs_list[i][0], inputs_list[i][1] + 3], 2)
+    MRE = RE / len(mktPrice_list)
+    return MRE
+
+
+def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list):
+    nb_iter = 0
+    x_list = [0.5, 1.5]
+    fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+    # Sorting
+    if fx_list[1] < fx_list[0]:
+        temp = x_list[0]
+        x_list[0] = x_list[1]
+        x_list[1] = temp
+    fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+    while fx_list[1] - fx_list[0] > MAX_ERROR and nb_iter < MAX_ITERS:
+        print(x_list, fx_list)
+        # Reflexion
+        xr = x_list[0] + (x_list[0] - x_list[1])
+        fxr = CEV_sigma_regularisation_minimisation_function(xr, inputs_list, mktPrice_list)
+        # Expansion
+        if fxr < fx_list[0]:
+            xe = x_list[0] + 2 * (x_list[0] - x_list[1])
+            fxe = CEV_sigma_regularisation_minimisation_function(xe, inputs_list, mktPrice_list)
+            if fxe <= fxr:
+                x_list = [xe, x_list[0]]
+            else:
+                x_list = [xr, x_list[0]]
+        # Contraction
+        else:
+            x_list = [x_list[0], 0.5 * (x_list[0] + x_list[1])]
+        # Recompute Each Error
+        fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+        # Sorting X List
+        if fx_list[1] < fx_list[0]:
+            temp = x_list[0]
+            x_list[0] = x_list[1]
+            x_list[1] = temp
+        fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+        # Add Nb Iter
+        nb_iter = nb_iter + 1
+    return x_list[0], nb_iter
 
 
 def CEV_minimisation_function(params_list: list, inputs_list: list, mktPrice_list: list):
