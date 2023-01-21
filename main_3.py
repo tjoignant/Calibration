@@ -51,7 +51,6 @@ print(f" - MSE: {error}")
 print(f" - nb iterations: {nit}")
 print(f" - optimum reached ({round(end - start, 1)}s)")
 
-
 # Estimate CEV Params (Nelder-Mead)
 start = time.perf_counter()
 params_nm, error_nm, nit_nm, hist_error_nm = cev.CEV_calibration_nelder_mead(inputs_list=inputs_list, mktPrice_list=mktPrice_list)
