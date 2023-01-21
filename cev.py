@@ -83,7 +83,27 @@ def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_lis
     :param mktPrice_list: [mktPrice_1, mktPrice_2, ...]
     :return: calibration error
     """
-    params_list: [gamma_, sigma0_]
+    # Compute Each Sigma0
+    sigma0_list = []
+    for i in range(0, len(mktPrice_list)):
+        sigma0_list.append(CEV_Sigma_Nelder_Mead_1D(inputs_list[i][0], inputs_list[i][1], inputs_list[i][2],
+                                                      inputs_list[i][3], inputs_list[i][4], params_list[0],
+                                                      mktPrice_list[i])[0])
+    # Build Sigma0 Surface
+    df_surface = pd.DataFrame(index=range(95, 105), columns=[3, 6, 9, 12])
+    for i in range(0, len(mktPrice_list)):
+        df_surface.loc[inputs_list[i][0], inputs_list[i][1]] = sigma0_list[i]
+    # Regularisation Error (RE)
+    RE = 0
+    for i in range(0, len(mktPrice_list)):
+        # Absolute Diff over strikes
+        if inputs_list[i][0] is not 104:
+            RE = RE + np.power(df_surface.loc[inputs_list[i][0], inputs_list[i][1]] -
+                               df_surface.loc[inputs_list[i][0] + 1, inputs_list[i][1]], 2)
+        # Diff over strikes
+        if inputs_list[i][0] is not 104:
+    return RE
+
 
 def CEV_minimisation_function(params_list: list, inputs_list: list, mktPrice_list: list):
     """
@@ -243,7 +263,7 @@ def CEV_calibration_nelder_mead(inputs_list: list, mktPrice_list: list):
 
 # particle class
 class Particle:
-    def __init__(self, dim, lowx, uppx, seed):
+    def __init__(self, dim: int, lowx: float, uppx: float, seed: int):
         """
         :param self: this Particle
         :param dim: dimension, i.e. in our case 2 since we have sigma and gamma
@@ -274,7 +294,7 @@ class Particle:
 
 
 # particle swarm optimization function
-def CEV_calibration_pso(n, dim, lowx, uppx, inputs_list: list, mktPrice_list: list):
+def CEV_calibration_pso(n: int, dim: int, lowx: float, uppx: float, inputs_list: list, mktPrice_list: list):
     """
     :param n: number of Particles in a swarm
     :param dim: dimension, i.e. in our case 2 since we have sigma and gamma
@@ -317,12 +337,6 @@ def CEV_calibration_pso(n, dim, lowx, uppx, inputs_list: list, mktPrice_list: li
     iteration = 0
     while previous_best_swarm_fitnessVal - best_swarm_fitnessVal > MAX_ERROR and iteration < MAX_ITERS:
 
-        # after every 10 iterations
-        # print iteration number and best fitness value so far
-
-        if iteration > 1:
-            print("Iter = " + str(iteration) + " best fitness = %.3f" % best_swarm_fitnessVal)
-
         for i in range(n):  # process each particle
 
             # compute new velocity of curr particle
@@ -359,7 +373,5 @@ def CEV_calibration_pso(n, dim, lowx, uppx, inputs_list: list, mktPrice_list: li
         # for-each particle
         iteration += 1
         list_best_swarm_fitness.append(copy.copy(best_swarm_fitnessVal))
-    # end_while
-    return best_swarm_pos, best_swarm_fitnessVal, iteration, list_best_swarm_fitness
-# end pso
 
+    return best_swarm_pos, best_swarm_fitnessVal, iteration, list_best_swarm_fitness

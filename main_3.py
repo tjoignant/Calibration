@@ -89,7 +89,7 @@ axs8.set_xticks(x, labels=map(str, particles))
 axs8.grid()
 axs8.set_xlabel("Iteration")
 axs8.set_ylabel("Particles")
-fig8.savefig('results/3_PSO_iterations.png')
+fig8.savefig('results/3.1_PSO_iterations.png')
 
 # We choose the PSO model with 6 particles because we can see on the above graph that it has good performances
 fig9, ax9 = plt.subplots(figsize=(15, 7.5))
@@ -104,7 +104,7 @@ ax9bis.plot(np.linspace(0, iteration_list[4], iteration_list[4]+1), error_list[4
 ax9bis.tick_params(axis='y', labelcolor="red")
 fig9.tight_layout()  # otherwise the right y-label is slightly clipped
 ax9.grid()
-fig9.savefig('results/3_error_iterations.png')
+fig9.savefig('results/3.2_error_iterations.png')
 
 # Display Graphs
 plt.show()
