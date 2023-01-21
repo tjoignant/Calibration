@@ -124,10 +124,10 @@ for maturity in [3, 6, 9, 12]:
 
 # Plot & Save Graph: Sigma0 Surface (with calibrated gamma)
 fig9 = plt.figure(figsize=(15, 7.5))
-axs9 = fig8.add_subplot(1, 1, 1, projection='3d')
-X, Y = np.meshgrid(df_cev_fixed_gamma["Strike"], [3, 6, 9, 12])
-Z = np.array([np.array(df_cev_fixed_gamma["sigma0 (3M)"]), np.array(df_cev_fixed_gamma["sigma0 (6M)"]),
-              np.array(df_cev_fixed_gamma["sigma0 (9M)"]), np.array(df_cev_fixed_gamma["sigma0 (12M)"])])
+axs9 = fig9.add_subplot(1, 1, 1, projection='3d')
+X, Y = np.meshgrid(df_cev_gamma["Strike"], [3, 6, 9, 12])
+Z = np.array([np.array(df_cev_gamma["sigma0 (3M)"]), np.array(df_cev_gamma["sigma0 (6M)"]),
+              np.array(df_cev_gamma["sigma0 (9M)"]), np.array(df_cev_gamma["sigma0 (12M)"])])
 surf = axs9.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm, linewidth=0, antialiased=False)
 axs9.set_xlabel("Strike")
 axs9.set_ylabel("Maturity")
