@@ -111,22 +111,22 @@ def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_lis
 def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list):
     nb_iter = 0
     x_list = [0.5, 1.5]
-    fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+    fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
     # Sorting
     if fx_list[1] < fx_list[0]:
         temp = x_list[0]
         x_list[0] = x_list[1]
         x_list[1] = temp
-    fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+    fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
     while fx_list[1] - fx_list[0] > MAX_ERROR and nb_iter < MAX_ITERS:
         print(x_list, fx_list)
         # Reflexion
         xr = x_list[0] + (x_list[0] - x_list[1])
-        fxr = CEV_sigma_regularisation_minimisation_function(xr, inputs_list, mktPrice_list)
+        fxr = CEV_sigma_regularisation_minimisation_function([xr], inputs_list, mktPrice_list)
         # Expansion
         if fxr < fx_list[0]:
             xe = x_list[0] + 2 * (x_list[0] - x_list[1])
-            fxe = CEV_sigma_regularisation_minimisation_function(xe, inputs_list, mktPrice_list)
+            fxe = CEV_sigma_regularisation_minimisation_function([xe], inputs_list, mktPrice_list)
             if fxe <= fxr:
                 x_list = [xe, x_list[0]]
             else:
@@ -135,13 +135,13 @@ def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list)
         else:
             x_list = [x_list[0], 0.5 * (x_list[0] + x_list[1])]
         # Recompute Each Error
-        fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+        fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
         # Sorting X List
         if fx_list[1] < fx_list[0]:
             temp = x_list[0]
             x_list[0] = x_list[1]
             x_list[1] = temp
-        fx_list = [CEV_sigma_regularisation_minimisation_function(params_list[x], inputs_list, mktPrice_list) for x in x_list]
+        fx_list = [CEV_sigma_regularisation_minimisation_function([x], inputs_list, mktPrice_list) for x in x_list]
         # Add Nb Iter
         nb_iter = nb_iter + 1
     return x_list[0], nb_iter
