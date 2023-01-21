@@ -122,7 +122,6 @@ def CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list: list, mktPrice_list: list)
         fx_list[0] = fx_list[1]
         fx_list[1] = temp_fx
     while fx_list[1] - fx_list[0] > MAX_ERROR / 10000 and nb_iter < MAX_ITERS:
-        print(nb_iter, x_list, fx_list)
         # Reflexion
         xr = x_list[0] + (x_list[0] - x_list[1])
         fxr = CEV_sigma_regularisation_minimisation_function([xr], inputs_list, mktPrice_list)

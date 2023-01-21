@@ -1,6 +1,6 @@
+import time
 import numpy as np
 import pandas as pd
-import time
 
 from matplotlib import cm
 from matplotlib import pyplot as plt

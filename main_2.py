@@ -1,3 +1,4 @@
+import time
 import warnings
 import numpy as np
 import pandas as pd
@@ -80,7 +81,7 @@ fig7.savefig('results/2.2_Interpolated_Volatilities_8M.png')
 # CEV Calibration (fixed gamma=1)
 df_cev_fixed_gamma = df_mkt
 
-# Compute Option's Implied Volatility (IV)
+# Compute Option's CEV sigma0 (with gamma=1)
 for maturity in [3, 6, 9, 12]:
     df_cev_fixed_gamma[f"sigma0 ({maturity}M)"] = df_cev_fixed_gamma.apply(
         lambda x: cev.CEV_Sigma_Nelder_Mead_1D(
@@ -111,16 +112,19 @@ inputs_list = []
 for i in range(0, len(mktPrice_list)):
     inputs_list.append((strike_list[i], maturity_list[i], 100, 1, "C"))
 
+start = time.perf_counter()
 gamma, nb_iter = cev.CEV_Gamma_Calibration_Nelder_Mead_1D(inputs_list, mktPrice_list)
-print("\nCEV Calibration:")
+end = time.perf_counter()
+print("\nCEV Calibration")
 print(f" - gamma: {gamma}")
 print(f" - nb_iter: {nb_iter}")
+print(f" - time: {round((end - start)/60, 1)}min")
 
-# Compute Option's Implied Volatility (IV)
+# Compute Option's CEV sigma0 (with calibrated gamma)
 for maturity in [3, 6, 9, 12]:
     df_cev_gamma[f"sigma0 ({maturity}M)"] = df_cev_gamma.apply(
         lambda x: cev.CEV_Sigma_Nelder_Mead_1D(
-            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, gamma=1, OptType="C")[0], axis=1)
+            MktPrice=x[f"Price ({maturity}M)"], df=1, f=100, k=x["Strike"], t=maturity / 12, gamma=gamma, OptType="C")[0], axis=1)
 
 # Plot & Save Graph: Sigma0 Surface (with calibrated gamma)
 fig9 = plt.figure(figsize=(15, 7.5))
@@ -133,6 +137,18 @@ axs9.set_xlabel("Strike")
 axs9.set_ylabel("Maturity")
 axs9.set_zlabel("Sigma0")
 fig9.savefig('results/2.4_Sigma0_Surface_Bis.png')
+
+# Compute New Option CEV Price (K=99.5, T=8M)
+strike_interp_6M = interpolation.Interp3D(x_list=df_cev_gamma["Strike"], y_list=df_cev_gamma["sigma0 (6M)"])
+strike_interp_9M = interpolation.Interp3D(x_list=df_cev_gamma["Strike"], y_list=df_cev_gamma["sigma0 (9M)"])
+maturity_interp = interpolation.Interp1D(x_list=[6, 9], y_list=[pow(strike_interp_6M.get_image(99.5), 2)*6/12,
+                                                                pow(strike_interp_9M.get_image(99.5), 2)*9/12])
+sigma0 = np.sqrt(maturity_interp.get_image(8)/(8/12))
+CEV_price = cev.CEV_Price(f=100, k=99.5, t=8 / 12, sigma0=sigma0, gamma=gamma, df=1, OptType="C")
+print(f"\nCEV Price")
+print(f" - Sigma0: {sigma0}")
+print(f" - Gamma: {gamma}")
+print(f" - Price: {CEV_price}")
 
 
 # ------------------------------------------- PART 2.3 : DUPIRE PRICE -------------------------------------------
