@@ -1,6 +1,7 @@
 import copy
 import random
 import numpy as np
+import pandas as pd
 import scipy.optimize as optimize
 
 MAX_ITERS = 500
@@ -101,9 +102,9 @@ def CEV_sigma_regularisation_minimisation_function(params_list: list, inputs_lis
             RE = RE + np.power(df_surface.loc[inputs_list[i][0], inputs_list[i][1]] -
                                df_surface.loc[inputs_list[i][0] + 1, inputs_list[i][1]], 2)
         # Diff over maturities
-        if inputs_list[i][1] != 12:
+        if inputs_list[i][1] != 1:
             RE = RE + np.power(df_surface.loc[inputs_list[i][0], inputs_list[i][1]] -
-                               df_surface.loc[inputs_list[i][0], inputs_list[i][1] + 3], 2)
+                               df_surface.loc[inputs_list[i][0], inputs_list[i][1] + 0.25], 2)
     MRE = RE / len(mktPrice_list)
     return MRE
 
